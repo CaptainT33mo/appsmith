@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import styled, { ThemeProvider } from "styled-components";
 import { useDispatch } from "react-redux";
 import type { RouteComponentProps } from "react-router";
@@ -15,11 +15,12 @@ import {
 } from "selectors/appViewSelectors";
 import EditorContextProvider from "components/editorComponents/EditorContextProvider";
 import AppViewerPageContainer from "./AppViewerPageContainer";
-import { editorInitializer } from "utils/editor/EditorUtils";
 import * as Sentry from "@sentry/react";
-import { getViewModePageList } from "selectors/editorSelectors";
+import {
+  getCurrentPageDescription,
+  getViewModePageList,
+} from "selectors/editorSelectors";
 import { getThemeDetails, ThemeMode } from "selectors/themeSelectors";
-import webfontloader from "webfontloader";
 import { getSearchQuery } from "utils/helpers";
 import { getSelectedAppTheme } from "selectors/appThemingSelectors";
 import { useSelector } from "react-redux";
@@ -35,17 +36,30 @@ import { initAppViewer } from "actions/initActions";
 import { WidgetGlobaStyles } from "globalStyles/WidgetGlobalStyles";
 import { getAppsmithConfigs } from "@appsmith/configs";
 import useWidgetFocus from "utils/hooks/useWidgetFocus/useWidgetFocus";
+import HtmlTitle from "./AppViewerHtmlTitle";
+import type { ApplicationPayload } from "@appsmith/constants/ReduxActionConstants";
+import { getCurrentApplication } from "@appsmith/selectors/applicationSelectors";
+import { editorInitializer } from "../../utils/editor/EditorUtils";
+import { widgetInitialisationSuccess } from "../../actions/widgetActions";
+import BottomBar from "components/BottomBar";
+import { areEnvironmentsFetched } from "@appsmith/selectors/environmentSelectors";
+import { datasourceEnvEnabled } from "@appsmith/selectors/featureFlagsSelectors";
 
 const AppViewerBody = styled.section<{
   hasPages: boolean;
   headerHeight: number;
   showGuidedTourMessage: boolean;
+  showBottomBar: boolean;
 }>`
   display: flex;
   flex-direction: row;
   align-items: stretch;
   justify-content: flex-start;
-  height: calc(100vh - ${({ headerHeight }) => headerHeight}px);
+  height: calc(
+    100vh -
+      ${(props) => (props.showBottomBar ? props.theme.bottomBarHeight : "0px")} -
+      ${({ headerHeight }) => headerHeight}px
+  );
   --view-mode-header-height: ${({ headerHeight }) => headerHeight}px;
 `;
 
@@ -69,7 +83,6 @@ function AppViewer(props: Props) {
   const dispatch = useDispatch();
   const { pathname, search } = props.location;
   const { applicationId, pageId } = props.match.params;
-  const [registered, setRegistered] = useState(false);
   const isInitialized = useSelector(getIsInitialized);
   const pages = useSelector(getViewModePageList);
   const selectedTheme = useSelector(getSelectedAppTheme);
@@ -81,30 +94,28 @@ function AppViewer(props: Props) {
   const branch = getSearchQuery(search, GIT_BRANCH_QUERY_KEY);
   const prevValues = usePrevious({ branch, location: props.location, pageId });
   const { hideWatermark } = getAppsmithConfigs();
+  const pageDescription = useSelector(getCurrentPageDescription);
+  const currentApplicationDetails: ApplicationPayload | undefined = useSelector(
+    getCurrentApplication,
+  );
 
   const focusRef = useWidgetFocus();
+
+  const workspaceId = currentApplicationDetails?.workspaceId || "";
+  const showBottomBar = useSelector((state: AppState) => {
+    return (
+      areEnvironmentsFetched(state, workspaceId) && datasourceEnvEnabled(state)
+    );
+  });
 
   /**
    * initializes the widgets factory and registers all widgets
    */
   useEffect(() => {
     editorInitializer().then(() => {
-      setRegistered(true);
+      dispatch(widgetInitialisationSuccess());
     });
-
-    // onMount initPage
-    if (applicationId || pageId) {
-      dispatch(
-        initAppViewer({
-          applicationId,
-          branch,
-          pageId,
-          mode: APP_MODE.PUBLISHED,
-        }),
-      );
-    }
-  }, []);
-
+  });
   /**
    * initialize the app if branch, pageId or application is changed
    */
@@ -158,17 +169,7 @@ function AppViewer(props: Props) {
    * loads font for canvas based on theme
    */
   useEffect(() => {
-    if (selectedTheme.properties.fontFamily.appFont !== DEFAULT_FONT_NAME) {
-      webfontloader.load({
-        google: {
-          families: [
-            `${selectedTheme.properties.fontFamily.appFont}:300,400,500,700`,
-          ],
-        },
-      });
-    }
-
-    document.body.style.fontFamily = appFontFamily;
+    document.body.style.fontFamily = `${appFontFamily}, sans-serif`;
 
     return function reset() {
       document.body.style.fontFamily = "inherit";
@@ -182,6 +183,10 @@ function AppViewer(props: Props) {
           fontFamily={selectedTheme.properties.fontFamily.appFont}
           primaryColor={selectedTheme.properties.colors.primaryColor}
         />
+        <HtmlTitle
+          description={pageDescription}
+          name={currentApplicationDetails?.name}
+        />
         <AppViewerBodyContainer
           backgroundColor={selectedTheme.properties.colors.backgroundColor}
         >
@@ -190,13 +195,17 @@ function AppViewer(props: Props) {
             hasPages={pages.length > 1}
             headerHeight={headerHeight}
             ref={focusRef}
+            showBottomBar={showBottomBar}
             showGuidedTourMessage={showGuidedTourMessage}
           >
-            {isInitialized && registered && <AppViewerPageContainer />}
+            {isInitialized && <AppViewerPageContainer />}
           </AppViewerBody>
+          {showBottomBar && <BottomBar viewMode />}
           {!hideWatermark && (
             <a
-              className="fixed hidden right-8 bottom-4 z-3 hover:no-underline md:flex"
+              className={`fixed hidden right-8 ${
+                showBottomBar ? "bottom-12" : "bottom-4"
+              } z-3 hover:no-underline md:flex`}
               href="https://appsmith.com"
               rel="noreferrer"
               target="_blank"

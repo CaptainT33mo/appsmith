@@ -1,6 +1,8 @@
 import { Colors } from "constants/Colors";
 import IconSVG from "./icon.svg";
 import Widget from "./widget";
+import type { RateWidgetProps } from "./widget";
+import { WIDGET_TAGS } from "constants/WidgetConstants";
 
 export const CONFIG = {
   features: {
@@ -12,6 +14,7 @@ export const CONFIG = {
   type: Widget.getWidgetType(),
   name: "Rating",
   iconSVG: IconSVG,
+  tags: [WIDGET_TAGS.CONTENT],
   needsMeta: true,
   searchTags: ["stars"],
   defaults: {
@@ -30,6 +33,37 @@ export const CONFIG = {
     tooltips: ["Terrible", "Bad", "Neutral", "Good", "Great"],
     widgetName: "Rating",
   },
+  autoLayout: {
+    disabledPropsDefaults: {
+      size: "LARGE",
+    },
+    defaults: {
+      columns: 7.272727,
+      rows: 4,
+    },
+    autoDimension: {
+      width: true,
+    },
+    widgetSize: [
+      {
+        viewportMinWidth: 0,
+        configuration: (props: RateWidgetProps) => {
+          let maxCount = props.maxCount;
+          if (typeof maxCount !== "number")
+            maxCount = parseInt(props.maxCount as any, 10);
+          return {
+            // 21 is the size of a star, 5 is the margin between stars
+            minWidth: `${maxCount * 21 + (maxCount + 1) * 5}px`,
+            minHeight: "40px",
+          };
+        },
+      },
+    ],
+    disableResizeHandles: {
+      horizontal: true,
+      vertical: true,
+    },
+  },
   properties: {
     derived: Widget.getDerivedPropertiesMap(),
     default: Widget.getDefaultPropertiesMap(),
@@ -38,6 +72,8 @@ export const CONFIG = {
     contentConfig: Widget.getPropertyPaneContentConfig(),
     styleConfig: Widget.getPropertyPaneStyleConfig(),
     stylesheetConfig: Widget.getStylesheetConfig(),
+    autocompleteDefinitions: Widget.getAutocompleteDefinitions(),
+    setterConfig: Widget.getSetterConfig(),
   },
 };
 

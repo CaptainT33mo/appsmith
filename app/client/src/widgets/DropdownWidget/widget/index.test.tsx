@@ -23,9 +23,7 @@ describe("<DropdownWidget />", () => {
       },
       users: {
         featureFlag: {
-          data: {
-            AUTO_LAYOUT: false,
-          },
+          data: {},
         },
       },
       propertyPane: {
@@ -43,6 +41,9 @@ describe("<DropdownWidget />", () => {
       },
       autoHeightUI: {
         isAutoHeightWithLimitsChanging: false,
+      },
+      mainCanvas: {
+        width: 1159,
       },
       canvasSelection: {
         isDraggingForSelection: false,

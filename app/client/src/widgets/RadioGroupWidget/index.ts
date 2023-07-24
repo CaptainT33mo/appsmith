@@ -1,12 +1,14 @@
-import IconSVG from "./icon.svg";
 import { Alignment } from "@blueprintjs/core";
-import Widget from "./widget";
 import { LabelPosition } from "components/constants";
+import IconSVG from "./icon.svg";
+import Widget from "./widget";
+import { WIDGET_TAGS } from "constants/WidgetConstants";
 
 export const CONFIG = {
   type: Widget.getWidgetType(),
   name: "Radio Group",
   iconSVG: IconSVG,
+  tags: [WIDGET_TAGS.TOGGLES],
   needsMeta: true,
   features: {
     dynamicHeight: {
@@ -44,6 +46,34 @@ export const CONFIG = {
     contentConfig: Widget.getPropertyPaneContentConfig(),
     styleConfig: Widget.getPropertyPaneStyleConfig(),
     stylesheetConfig: Widget.getStylesheetConfig(),
+    autocompleteDefinitions: Widget.getAutocompleteDefinitions(),
+    setterConfig: Widget.getSetterConfig(),
+  },
+  autoLayout: {
+    defaults: {
+      columns: 14,
+      rows: 7,
+    },
+    disabledPropsDefaults: {
+      labelPosition: LabelPosition.Top,
+    },
+    autoDimension: {
+      height: true,
+    },
+    widgetSize: [
+      {
+        viewportMinWidth: 0,
+        configuration: () => {
+          return {
+            minWidth: "240px",
+            minHeight: "70px",
+          };
+        },
+      },
+    ],
+    disableResizeHandles: {
+      vertical: true,
+    },
   },
 };
 

@@ -95,7 +95,7 @@ export function getEntityNameAndPropertyPath(fullPath: string): {
   return { entityName, propertyPath };
 }
 
-function translateCollectionDiffs(
+export function translateCollectionDiffs(
   propertyPath: string,
   data: unknown,
   event: DataTreeDiffEvent,
@@ -391,6 +391,15 @@ export function isJSAction(entity: DataTreeEntity): entity is JSActionEntity {
     entity.ENTITY_TYPE === ENTITY_TYPE.JSACTION
   );
 }
+export function isJSActionConfig(
+  entity: DataTreeEntityConfig,
+): entity is JSActionEntityConfig {
+  return (
+    typeof entity === "object" &&
+    "ENTITY_TYPE" in entity &&
+    entity.ENTITY_TYPE === ENTITY_TYPE.JSACTION
+  );
+}
 
 export function isJSObject(entity: DataTreeEntity): entity is JSActionEntity {
   return (
@@ -400,6 +409,10 @@ export function isJSObject(entity: DataTreeEntity): entity is JSActionEntity {
     "pluginType" in entity &&
     entity.pluginType === PluginType.JS
   );
+}
+
+export function isDataTreeEntity(entity: unknown) {
+  return !!entity && typeof entity === "object" && "ENTITY_TYPE" in entity;
 }
 
 // We need to remove functions from data tree to avoid any unexpected identifier while JSON parsing
@@ -491,7 +504,7 @@ export const getAllPaths = (
       const tempKey = curKey ? `${curKey}[${i}]` : `${i}`;
       getAllPaths(records[i], tempKey, result);
     }
-  } else if (typeof records === "object" && records) {
+  } else if (isTrueObject(records)) {
     for (const key of Object.keys(records)) {
       const tempKey = curKey ? `${curKey}.${key}` : `${key}`;
       getAllPaths(records[key], tempKey, result);
@@ -651,31 +664,31 @@ export const isDynamicLeaf = (
 };
 
 export const addWidgetPropertyDependencies = ({
-  entity,
-  entityName,
+  widgetConfig,
+  widgetName,
 }: {
-  entity: WidgetEntityConfig;
-  entityName: string;
+  widgetConfig: WidgetEntityConfig;
+  widgetName: string;
 }) => {
   const dependencies: DependencyMap = {};
 
-  Object.entries(entity.propertyOverrideDependency).forEach(
+  Object.entries(widgetConfig.propertyOverrideDependency).forEach(
     ([overriddenPropertyKey, overridingPropertyKeyMap]) => {
       const existingDependenciesSet = new Set(
-        dependencies[`${entityName}.${overriddenPropertyKey}`] || [],
+        dependencies[`${widgetName}.${overriddenPropertyKey}`] || [],
       );
       // add meta dependency
       overridingPropertyKeyMap.META &&
         existingDependenciesSet.add(
-          `${entityName}.${overridingPropertyKeyMap.META}`,
+          `${widgetName}.${overridingPropertyKeyMap.META}`,
         );
       // add default dependency
       overridingPropertyKeyMap.DEFAULT &&
         existingDependenciesSet.add(
-          `${entityName}.${overridingPropertyKeyMap.DEFAULT}`,
+          `${widgetName}.${overridingPropertyKeyMap.DEFAULT}`,
         );
 
-      dependencies[`${entityName}.${overriddenPropertyKey}`] = [
+      dependencies[`${widgetName}.${overriddenPropertyKey}`] = [
         ...existingDependenciesSet,
       ];
     },
@@ -770,6 +783,8 @@ export const overrideWidgetProperties = (params: {
   evalMetaUpdates: EvalMetaUpdates;
   fullPropertyPath: string;
   isNewWidget: boolean;
+  shouldUpdateGlobalContext?: boolean;
+  overriddenProperties?: string[];
 }) => {
   const {
     configTree,
@@ -778,7 +793,9 @@ export const overrideWidgetProperties = (params: {
     evalMetaUpdates,
     fullPropertyPath,
     isNewWidget,
+    overriddenProperties,
     propertyPath,
+    shouldUpdateGlobalContext,
     value,
   } = params;
   const clonedValue = klona(value);
@@ -800,9 +817,14 @@ export const overrideWidgetProperties = (params: {
       if (pathsNotToOverride.includes(overriddenPropertyPath)) return;
       _.set(
         currentTree,
-        [entity.widgetName, ...overriddenPropertyPathArray],
+        [entityName, ...overriddenPropertyPathArray],
         clonedValue,
       );
+
+      if (shouldUpdateGlobalContext) {
+        _.set(self, [entityName, ...overriddenPropertyPathArray], clonedValue);
+      }
+      overriddenProperties?.push(overriddenPropertyPath);
       // evalMetaUpdates has all updates from property which overrides meta values.
       if (
         propertyPath.split(".")[0] !== "meta" &&
@@ -825,15 +847,19 @@ export const overrideWidgetProperties = (params: {
     const propertyOverridingKeyMap =
       configEntity.propertyOverrideDependency[propertyPath];
     if (propertyOverridingKeyMap.DEFAULT) {
-      const defaultValue = configEntity[propertyOverridingKeyMap.DEFAULT];
+      const defaultValue = entity[propertyOverridingKeyMap.DEFAULT];
       const clonedDefaultValue = klona(defaultValue);
       if (defaultValue !== undefined) {
         const propertyPathArray = propertyPath.split(".");
         _.set(
           currentTree,
-          [entity.widgetName, ...propertyPathArray],
+          [entityName, ...propertyPathArray],
           clonedDefaultValue,
         );
+
+        if (shouldUpdateGlobalContext) {
+          _.set(self, [entityName, ...propertyPathArray], clonedDefaultValue);
+        }
 
         return {
           overwriteParsedValue: true,

@@ -8,7 +8,6 @@ import {
   setWidgetDynamicProperty,
   updateWidgetPropertyRequest,
 } from "actions/controlActions";
-import { Toaster, Variant } from "design-system-old";
 import AnalyticsUtil from "utils/AnalyticsUtil";
 
 import {
@@ -21,6 +20,12 @@ import type { CanvasWidgetsReduxState } from "reducers/entityReducers/canvasWidg
 import { setSnipingMode } from "actions/propertyPaneActions";
 import { selectWidgetInitAction } from "actions/widgetSelectionActions";
 import { SelectionRequestType } from "sagas/WidgetSelectUtils";
+import { toast } from "design-system";
+import {
+  AB_TESTING_EVENT_KEYS,
+  FEATURE_FLAG,
+} from "@appsmith/entities/FeatureFlag";
+import { selectFeatureFlagCheck } from "@appsmith/selectors/featureFlagsSelectors";
 
 const WidgetTypes = WidgetFactory.widgetTypes;
 
@@ -36,12 +41,15 @@ export function* bindDataToWidgetSaga(
     ),
   );
   const widgetState: CanvasWidgetsReduxState = yield select(getCanvasWidgets);
+  const isDSBindingEnabled: boolean = yield select(
+    selectFeatureFlagCheck,
+    FEATURE_FLAG.ab_ds_binding_enabled,
+  );
   const selectedWidget = widgetState[action.payload.widgetId];
 
   if (!selectedWidget || !selectedWidget.type) {
-    Toaster.show({
-      text: SNIPING_SELECT_WIDGET_AGAIN(),
-      variant: Variant.warning,
+    toast.show(SNIPING_SELECT_WIDGET_AGAIN(), {
+      kind: "warning",
     });
     return;
   }
@@ -53,6 +61,7 @@ export function* bindDataToWidgetSaga(
   // Pranav has an Open PR for this file so just returning for now
   if (!currentAction) return;
 
+  //TODO (Balaji): Abstraction leak. propertyPath should come from the widget
   switch (selectedWidget.type) {
     case WidgetTypes.BUTTON_WIDGET:
     case WidgetTypes.FORM_BUTTON_WIDGET:
@@ -149,6 +158,9 @@ export function* bindDataToWidgetSaga(
     apiId: queryId,
     propertyPath,
     propertyValue,
+    [AB_TESTING_EVENT_KEYS.abTestingFlagLabel]:
+      FEATURE_FLAG.ab_ds_binding_enabled,
+    [AB_TESTING_EVENT_KEYS.abTestingFlagValue]: isDSBindingEnabled,
   });
   if (queryId && isValidProperty) {
     // set the property path to dynamic, i.e. enable JS mode
@@ -160,9 +172,8 @@ export function* bindDataToWidgetSaga(
     yield put(selectWidgetInitAction(SelectionRequestType.One, [widgetId]));
   } else {
     queryId &&
-      Toaster.show({
-        text: SNIPING_NOT_SUPPORTED(),
-        variant: Variant.warning,
+      toast.show(SNIPING_NOT_SUPPORTED(), {
+        kind: "warning",
       });
   }
 }

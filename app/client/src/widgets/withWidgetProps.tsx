@@ -8,6 +8,7 @@ import {
   GridDefaults,
   MAIN_CONTAINER_WIDGET_ID,
   RenderModes,
+  WIDGET_PADDING,
 } from "constants/WidgetConstants";
 import { useDispatch, useSelector } from "react-redux";
 import { getWidget } from "sagas/selectors";
@@ -25,8 +26,9 @@ import {
   getMetaWidget,
   getFlattenedChildCanvasWidgets,
   previewModeSelector,
+  getIsAutoLayoutMobileBreakPoint,
+  getCanvasWidth,
 } from "selectors/editorSelectors";
-import { getIsMobile } from "selectors/mainCanvasSelectors";
 import {
   createCanvasWidget,
   createLoadingWidget,
@@ -41,9 +43,10 @@ import {
 } from "utils/autoLayout/constants";
 import { isAutoHeightEnabledForWidget } from "./WidgetUtils";
 import { CANVAS_DEFAULT_MIN_HEIGHT_PX } from "constants/AppConstants";
-import { getGoogleMapsApiKey } from "ce/selectors/tenantSelectors";
+import { getGoogleMapsApiKey } from "@appsmith/selectors/tenantSelectors";
 import ConfigTreeActions from "utils/configTree";
 import { getSelectedWidgetAncestry } from "../selectors/widgetSelectors";
+import { getWidgetMinMaxDimensionsInPixel } from "utils/autoLayout/flexWidgetUtils";
 
 const WIDGETS_WITH_CHILD_WIDGETS = ["LIST_WIDGET", "FORM_WIDGET"];
 const WIDGETS_REQUIRING_SELECTED_ANCESTRY = ["MODAL_WIDGET", "TABS_WIDGET"];
@@ -64,6 +67,8 @@ function withWidgetProps(WrappedWidget: typeof BaseWidget) {
     const canvasWidget = useSelector((state: AppState) =>
       getWidget(state, widgetId),
     );
+
+    const mainCanvasWidth = useSelector(getCanvasWidth);
     const metaWidget = useSelector(getMetaWidget(widgetId));
 
     const mainCanvasProps = useSelector((state: AppState) =>
@@ -85,8 +90,9 @@ function withWidgetProps(WrappedWidget: typeof BaseWidget) {
       getMetaWidgetChildrenStructure(widgetId, type, hasMetaWidgets),
       equal,
     );
-    const isMobile = useSelector(getIsMobile);
+    const isMobile = useSelector(getIsAutoLayoutMobileBreakPoint);
     const appPositioningType = useSelector(getCurrentAppPositioningType);
+    const isAutoLayout = appPositioningType === AppPositioningTypes.AUTO;
 
     const configTree = ConfigTreeActions.getConfigTree();
     const evaluatedWidgetConfig = configTree[
@@ -196,12 +202,10 @@ function withWidgetProps(WrappedWidget: typeof BaseWidget) {
         widgetProps.onReset = props.onReset;
         if ("isFormValid" in props) widgetProps.isFormValid = props.isFormValid;
       }
-
       if (defaultAutoLayoutWidgets.includes(props.type)) {
-        widgetProps.positioning =
-          appPositioningType && appPositioningType === AppPositioningTypes.AUTO
-            ? Positioning.Vertical
-            : Positioning.Fixed;
+        widgetProps.positioning = isAutoLayout
+          ? Positioning.Vertical
+          : Positioning.Fixed;
       }
 
       widgetProps.children = children;
@@ -237,6 +241,8 @@ function withWidgetProps(WrappedWidget: typeof BaseWidget) {
       widgetProps.topRow === widgetProps.bottomRow &&
       renderMode === RenderModes.CANVAS &&
       !isPreviewMode;
+
+    widgetProps.maincanvasWidth = mainCanvasWidth;
 
     // We don't render invisible widgets in view mode
     if (shouldCollapseWidgetInViewOrPreviewMode) {
@@ -286,6 +292,29 @@ function withWidgetProps(WrappedWidget: typeof BaseWidget) {
       } else {
         dispatch(checkContainersForAutoHeightAction());
       }
+    }
+
+    // Sets the min/max height/width of the widget
+    if (isAutoLayout) {
+      const minMaxDimensions = getWidgetMinMaxDimensionsInPixel(
+        widgetProps,
+        mainCanvasWidth,
+      );
+      widgetProps = {
+        ...widgetProps,
+        minWidth: minMaxDimensions.minWidth
+          ? minMaxDimensions.minWidth - 2 * WIDGET_PADDING
+          : undefined,
+        minHeight: minMaxDimensions.minHeight
+          ? minMaxDimensions.minHeight - 2 * WIDGET_PADDING
+          : undefined,
+        maxWidth: minMaxDimensions.maxWidth
+          ? minMaxDimensions.maxWidth - 2 * WIDGET_PADDING
+          : undefined,
+        maxHeight: minMaxDimensions.maxHeight
+          ? minMaxDimensions.maxHeight - 2 * WIDGET_PADDING
+          : undefined,
+      };
     }
 
     return <WrappedWidget {...widgetProps} />;

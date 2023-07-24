@@ -745,6 +745,34 @@ const migrations: Migration[] = [
     ],
     version: 76,
   },
+  {
+    functionLookup: [
+      {
+        moduleObj: tableMigrations,
+        functionName: "migrateTableSelectOptionAttributesForNewRow",
+      },
+    ],
+    version: 77,
+  },
+  {
+    functionLookup: [
+      {
+        moduleObj: tableMigrations,
+        functionName:
+          "migrateBindingPrefixSuffixForInlineEditValidationControl",
+      },
+    ],
+    version: 78,
+  },
+  {
+    functionLookup: [
+      {
+        moduleObj: tableMigrations,
+        functionName: "migrateTableWidgetTableDataJsMode",
+      },
+    ],
+    version: 79,
+  },
 ];
 
 const mockFnObj: Record<number, any> = {};

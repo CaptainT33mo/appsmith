@@ -3,6 +3,7 @@ import { createReducer } from "utils/ReducerUtils";
 import type {
   UpdateWidgetMetaPropertyPayload,
   ResetWidgetMetaPayload,
+  BatchUpdateWidgetMetaPropertyPayload,
 } from "actions/metaActions";
 
 import type { ReduxAction } from "@appsmith/constants/ReduxActionConstants";
@@ -29,6 +30,8 @@ export const metaReducer = createReducer(initialState, {
   ) => {
     const { evalMetaUpdates } = action.payload;
 
+    if (!evalMetaUpdates.length) return state;
+
     // if metaObject is updated in dataTree we also update meta values, to keep meta state in sync.
     const newMetaState = produce(state, (draftMetaState) => {
       evalMetaUpdates.forEach(({ metaPropertyPath, value, widgetId }) => {
@@ -48,6 +51,20 @@ export const metaReducer = createReducer(initialState, {
         `${action.payload.widgetId}.${action.payload.propertyName}`,
         action.payload.propertyValue,
       );
+      return draftMetaState;
+    });
+
+    return nextState;
+  },
+  [ReduxActionTypes.BATCH_UPDATE_META_PROPS]: (
+    state: MetaState,
+    action: ReduxAction<BatchUpdateWidgetMetaPropertyPayload>,
+  ) => {
+    const nextState = produce(state, (draftMetaState) => {
+      const { batchMetaUpdates } = action.payload;
+      batchMetaUpdates.forEach(({ propertyName, propertyValue, widgetId }) => {
+        set(draftMetaState, `${widgetId}.${propertyName}`, propertyValue);
+      });
       return draftMetaState;
     });
 
