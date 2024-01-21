@@ -33,7 +33,7 @@ import type {
   MenuItem,
   PopoverContentProps,
 } from "../constants";
-import type { ThemeProp } from "widgets/constants";
+import type { ThemeProp } from "WidgetProvider/constants";
 
 const PopoverStyles = createGlobalStyle<{
   parentWidth: number;
@@ -42,15 +42,15 @@ const PopoverStyles = createGlobalStyle<{
   borderRadius: string;
 }>`
   .menu-button-popover, .${BlueprintClasses.MINIMAL}.menu-button-popover.${
-  Classes.POPOVER2
-} {
+    Classes.POPOVER2
+  } {
     background: none;
     box-shadow: 0 6px 20px 0px rgba(0, 0, 0, 0.15) !important;
     margin-top: 8px !important;
     margin-bottom: 8px !important;
     border-radius: ${({ borderRadius }) =>
       borderRadius >= THEMEING_TEXT_SIZES.lg ? `0.375rem` : borderRadius};
-    overflow-y: scroll;
+    overflow-y: auto;
     max-height: 384px;
   }
 
@@ -59,7 +59,7 @@ const PopoverStyles = createGlobalStyle<{
     border-radius: 0;
   }
 
-  & > .${Classes.POPOVER2_TARGET} {
+  .menu-button-popover-target {
     height: 100%;
   }
 
@@ -389,6 +389,7 @@ function MenuButtonComponent(props: MenuButtonComponentProps) {
         parentWidth={width - WidgetContainerDiff}
       />
       <Popover2
+        className="menu-button-popover-target"
         content={
           <PopoverContent
             backgroundColor={menuColor}

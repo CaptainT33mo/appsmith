@@ -14,7 +14,7 @@ import {
   getPlugin,
   getPluginForm,
   getPlugins,
-} from "selectors/entitiesSelector";
+} from "@appsmith/selectors/entitiesSelector";
 import type { Datasource } from "entities/Datasource";
 import type { Plugin } from "api/PluginApi";
 import {
@@ -31,14 +31,18 @@ import {
 import type { ApiResponse } from "api/ApiResponses";
 import PluginApi from "api/PluginApi";
 import log from "loglevel";
-import { getGraphQLPlugin, PluginType } from "entities/Action";
+import {
+  getAppsmithAIPlugin,
+  getGraphQLPlugin,
+  PluginType,
+} from "entities/Action";
 import type {
   FormEditorConfigs,
   FormSettingsConfigs,
   FormDependencyConfigs,
   FormDatasourceButtonConfigs,
 } from "utils/DynamicBindingUtils";
-import type { ActionDataState } from "reducers/entityReducers/actionsReducer";
+import type { ActionDataState } from "@appsmith/reducers/entityReducers/actionsReducer";
 
 function* fetchPluginsSaga(
   action: ReduxAction<{ workspaceId?: string } | undefined>,
@@ -81,12 +85,17 @@ function* fetchPluginFormConfigsSaga() {
     const apiPlugin = plugins.find((plugin) => plugin.type === PluginType.API);
     const jsPlugin = plugins.find((plugin) => plugin.type === PluginType.JS);
     const graphqlPlugin = getGraphQLPlugin(plugins);
+    const appsmithAIPlugin = getAppsmithAIPlugin(plugins);
     if (apiPlugin) {
       pluginIdFormsToFetch.add(apiPlugin.id);
     }
 
     if (graphqlPlugin) {
       pluginIdFormsToFetch.add(graphqlPlugin.id);
+    }
+
+    if (appsmithAIPlugin) {
+      pluginIdFormsToFetch.add(appsmithAIPlugin.id);
     }
 
     const actions: ActionDataState = yield select(getActions);
@@ -96,12 +105,15 @@ function* fetchPluginFormConfigsSaga() {
     }
 
     const pluginFormData: PluginFormPayload[] = [];
+
     const pluginFormResponses: ApiResponse<PluginFormPayload>[] = yield all(
       [...pluginIdFormsToFetch].map((id) =>
         call(PluginsApi.fetchFormConfig, id),
       ),
     );
-    for (const response of pluginFormResponses) {
+
+    for (let i = 0; i < pluginFormResponses.length; i++) {
+      const response = pluginFormResponses[i];
       yield validateResponse(response);
       pluginFormData.push(response.data);
     }
@@ -124,35 +136,39 @@ function* fetchPluginFormConfigsSaga() {
         dependencies[pluginId] = defaultActionDependenciesConfig[plugin.type];
       } else {
         // Datasource form always use server's copy
-        formConfigs[pluginId] = pluginFormData[index].form;
-        // Action editor form if not available use default
-        if (plugin && !pluginFormData[index].editor) {
-          editorConfigs[pluginId] = defaultActionEditorConfigs[plugin.type];
-        } else {
-          editorConfigs[pluginId] = pluginFormData[index].editor;
-        }
-        // Action settings form if not available use default
-        if (plugin && !pluginFormData[index].setting) {
-          settingConfigs[pluginId] = defaultActionSettings[plugin.type];
-        } else {
-          settingConfigs[pluginId] = pluginFormData[index].setting;
-        }
-        // Action dependencies config if not available use default
-        if (plugin && !pluginFormData[index].dependencies) {
-          dependencies[pluginId] = defaultActionDependenciesConfig[plugin.type];
-        } else {
-          dependencies[pluginId] = pluginFormData[index].dependencies;
-        }
-        // Datasource form buttons config if not available use default
-        if (plugin && !pluginFormData[index].formButton) {
-          datasourceFormButtonConfigs[pluginId] =
-            defaultDatasourceFormButtonConfig[plugin.type];
-        } else {
-          datasourceFormButtonConfigs[pluginId] =
-            pluginFormData[index].formButton;
+        if (!!pluginFormData[index]) {
+          formConfigs[pluginId] = pluginFormData[index].form;
+          // Action editor form if not available use default
+          if (plugin && !pluginFormData[index].editor) {
+            editorConfigs[pluginId] = defaultActionEditorConfigs[plugin.type];
+          } else {
+            editorConfigs[pluginId] = pluginFormData[index].editor;
+          }
+          // Action settings form if not available use default
+          if (plugin && !pluginFormData[index].setting) {
+            settingConfigs[pluginId] = defaultActionSettings[plugin.type];
+          } else {
+            settingConfigs[pluginId] = pluginFormData[index].setting;
+          }
+          // Action dependencies config if not available use default
+          if (plugin && !pluginFormData[index].dependencies) {
+            dependencies[pluginId] =
+              defaultActionDependenciesConfig[plugin.type];
+          } else {
+            dependencies[pluginId] = pluginFormData[index].dependencies;
+          }
+          // Datasource form buttons config if not available use default
+          if (plugin && !pluginFormData[index].formButton) {
+            datasourceFormButtonConfigs[pluginId] =
+              defaultDatasourceFormButtonConfig[plugin.type];
+          } else {
+            datasourceFormButtonConfigs[pluginId] =
+              pluginFormData[index].formButton;
+          }
         }
       }
     });
+
     yield put(
       fetchPluginFormConfigsSuccess({
         formConfigs,
@@ -163,7 +179,6 @@ function* fetchPluginFormConfigsSaga() {
       }),
     );
   } catch (error) {
-    log.error(error);
     yield put({
       type: ReduxActionErrorTypes.FETCH_PLUGIN_FORM_CONFIGS_ERROR,
       payload: { error },
@@ -214,7 +229,10 @@ export function* checkAndGetPluginFormConfigsSaga(pluginId: string) {
   }
 }
 
-type GetPluginFormConfigParams = { id: string; type: string };
+interface GetPluginFormConfigParams {
+  id: string;
+  type: string;
+}
 
 function* getPluginFormConfig({ id }: GetPluginFormConfigParams) {
   yield call(checkAndGetPluginFormConfigsSaga, id);

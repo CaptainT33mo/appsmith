@@ -35,8 +35,9 @@ export const CodeEditorColors = {
   STRING: "#1659df",
   OPERATOR: "#009595",
   NUMBER: "#555",
-  COMMENT: "#008000",
+  COMMENT: "var(--ads-v2-color-gray-400)",
   FUNCTION_ARGS: "hsl(288, 44%, 44%)",
+  TOOLTIP_FN_ARGS: "#DB6E33",
 };
 
 export const EditorWrapper = styled.div<{
@@ -126,6 +127,7 @@ export const EditorWrapper = styled.div<{
               return "var(--ads-v2-color-border)";
           }
         }};
+      ${(props) => props.borderLess && "border: none;"}
 
       background: var(--ads-v2-color-bg);
       color: var(--ads-v2-color-fg);
@@ -139,6 +141,10 @@ export const EditorWrapper = styled.div<{
       }
       .cm-keyword {
         color: ${CodeEditorColors.KEYWORD};
+      }
+
+      .cm-comment {
+        color: ${CodeEditorColors.COMMENT};
       }
 
       .CodeMirror-foldgutter {
@@ -192,9 +198,6 @@ export const EditorWrapper = styled.div<{
       }
 
       .cm-atom + span + .cm-property,
-      .cm-variable-2 + span + .cm-property {
-        color: #364252;
-      }
 
       /* object keys, object methods */
       .cm-keyword + span + .cm-property,
@@ -222,9 +225,8 @@ export const EditorWrapper = styled.div<{
         color: #364252;
       }
 
-      .binding-brackets,
-      .CodeMirror-matchingbracket,
-      .binding-highlight {
+      .cm-binding-brackets,
+      .CodeMirror-matchingbracket {
         font-weight: 400;
       }
 
@@ -233,7 +235,7 @@ export const EditorWrapper = styled.div<{
         font-weight: 600;
       }
 
-      .binding-brackets {
+      .cm-binding-brackets {
         // letter-spacing: -1.8px;
         color: hsl(222, 70%, 77%);
       }
@@ -254,7 +256,7 @@ export const EditorWrapper = styled.div<{
       background: var(--ads-v2-color-bg-subtle);
     }
     .cm-s-duotone-light .CodeMirror-linenumber,
-    .binding-brackets {
+    .cm-binding-brackets {
       color: ${(props) =>
         props.editorTheme === EditorTheme.DARK
           ? props.theme.colors.bindingTextDark
@@ -388,13 +390,17 @@ export const EditorWrapper = styled.div<{
 
     &:hover {
       .CodeMirror.cm-s-duotone-light {
-        border-color: var(--ads-v2-color-border-emphasis);
+        border-color: ${(props) =>
+          props.borderLess ? "none" : "var(--ads-v2-color-border-emphasis)"};
       }
     }
 
     &:focus {
       .CodeMirror.cm-s-duotone-light {
-        border-color: var(--ads-v2-color-border-emphasis-plus);
+        border-color: ${(props) =>
+          props.borderLess
+            ? "none"
+            : "var(--ads-v2-color-border-emphasis-plus)"};
       }
     }
 

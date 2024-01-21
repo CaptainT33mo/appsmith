@@ -5,6 +5,7 @@ import com.appsmith.external.dtos.GitLogDTO;
 import com.appsmith.external.dtos.GitStatusDTO;
 import com.appsmith.external.dtos.MergeStatusDTO;
 import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.lib.BranchTrackingStatus;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
@@ -113,9 +114,13 @@ public interface GitExecutor {
      * @param repoSuffix suffixedPath used to generate the base repo path this includes orgId, defaultAppId, repoName
      * @return List of branches for the application
      */
-    Mono<List<GitBranchDTO>> listBranches(
-            Path repoSuffix, String remoteUrl, String privateKey, String publicKey, Boolean isDefaultBranchNeeded);
+    //    Mono<List<GitBranchDTO>> listBranches(
+    //            Path repoSuffix, String remoteUrl, String privateKey, String publicKey, Boolean
+    // isDefaultBranchNeeded);
 
+    Mono<String> getRemoteDefaultBranch(Path repoSuffix, String remoteUrl, String privateKey, String publicKey);
+
+    Mono<List<GitBranchDTO>> listBranches(Path repoSuffix);
     /**
      * This method will handle the git-status functionality
      *
@@ -188,4 +193,8 @@ public interface GitExecutor {
     Mono<Boolean> resetHard(Path repoSuffix, String branchName);
 
     Mono<Boolean> rebaseBranch(Path repoSuffix, String branchName);
+
+    Path createRepoPath(Path suffix);
+
+    Mono<BranchTrackingStatus> getBranchTrackingStatus(Path repoPath, String branchName);
 }

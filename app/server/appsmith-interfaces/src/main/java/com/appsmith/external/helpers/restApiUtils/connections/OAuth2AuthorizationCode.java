@@ -12,7 +12,6 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.bson.internal.Base64;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
@@ -33,6 +32,7 @@ import java.net.URI;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.Map;
 
 import static com.appsmith.external.models.OAuth2.RefreshTokenClientCredentialsLocation.BODY;
@@ -116,7 +116,7 @@ public class OAuth2AuthorizationCode extends APIConnection implements UpdatableC
 
         if (HEADER.equals(oAuth2.getRefreshTokenClientCredentialsLocation())) {
             byte[] clientCredentials = (oAuth2.getClientId() + ":" + oAuth2.getClientSecret()).getBytes();
-            final String authorizationHeader = "Basic " + Base64.encode(clientCredentials);
+            final String authorizationHeader = "Basic " + Base64.getEncoder().encodeToString(clientCredentials);
             webClientBuilder.defaultHeader("Authorization", authorizationHeader);
         }
 
@@ -157,6 +157,11 @@ public class OAuth2AuthorizationCode extends APIConnection implements UpdatableC
                     if (mappedResponse.containsKey(Authentication.REFRESH_TOKEN)) {
                         authenticationResponse.setRefreshToken(
                                 String.valueOf(mappedResponse.get(Authentication.REFRESH_TOKEN)));
+                    } else {
+                        authenticationResponse.setRefreshToken(datasourceConfiguration
+                                .getAuthentication()
+                                .getAuthenticationResponse()
+                                .getRefreshToken());
                     }
                     authenticationResponse.setToken(String.valueOf(mappedResponse.get(Authentication.ACCESS_TOKEN)));
                     oAuth2.setAuthenticationResponse(authenticationResponse);

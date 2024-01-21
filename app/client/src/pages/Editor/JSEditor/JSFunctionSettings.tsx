@@ -1,33 +1,42 @@
-import { updateFunctionProperty } from "actions/jsPaneActions";
 import {
-  ASYNC_FUNCTION_SETTINGS_HEADING,
+  FUNCTION_SETTINGS_HEADING,
+  NO_JS_FUNCTIONS,
   createMessage,
-  NO_ASYNC_FUNCTIONS,
 } from "@appsmith/constants/messages";
 import type { JSAction } from "entities/JSCollection";
 import React, { useState } from "react";
-import { useDispatch } from "react-redux";
 import styled from "styled-components";
 import { RADIO_OPTIONS, SETTINGS_HEADINGS } from "./constants";
 import AnalyticsUtil from "utils/AnalyticsUtil";
 import { Icon, Radio, RadioGroup, Tooltip } from "design-system";
 
-type SettingsHeadingProps = {
+interface SettingsHeadingProps {
   text: string;
   hasInfo?: boolean;
   info?: string;
   grow: boolean;
-};
+}
 
-type SettingsItemProps = {
+export interface OnUpdateSettingsProps {
+  value: boolean | number;
+  propertyName: string;
+  action: JSAction;
+}
+
+interface SettingsItemProps {
   action: JSAction;
   disabled?: boolean;
-};
+  onUpdateSettings?: (props: OnUpdateSettingsProps) => void;
+  renderAdditionalColumns?: (action: JSAction) => React.ReactNode;
+}
 
-type JSFunctionSettingsProps = {
+export interface JSFunctionSettingsProps {
   actions: JSAction[];
   disabled?: boolean;
-};
+  onUpdateSettings: SettingsItemProps["onUpdateSettings"];
+  renderAdditionalColumns?: SettingsItemProps["renderAdditionalColumns"];
+  additionalHeadings?: typeof SETTINGS_HEADINGS;
+}
 
 const SettingRow = styled.div<{ isHeading?: boolean; noBorder?: boolean }>`
   display: flex;
@@ -51,7 +60,10 @@ const StyledIcon = styled(Icon)`
   height: max-content;
 `;
 
-const SettingColumn = styled.div<{ grow?: boolean; isHeading?: boolean }>`
+export const SettingColumn = styled.div<{
+  grow?: boolean;
+  isHeading?: boolean;
+}>`
   display: flex;
   align-items: center;
   flex-grow: ${(props) => (props.grow ? 1 : 0)};
@@ -72,9 +84,8 @@ const SettingColumn = styled.div<{ grow?: boolean; isHeading?: boolean }>`
 `;
 
 const JSFunctionSettingsWrapper = styled.div`
-  display: flex;
   height: 100%;
-  overflow: auto;
+  overflow: hidden;
 `;
 
 const SettingsContainer = styled.div`
@@ -83,18 +94,24 @@ const SettingsContainer = styled.div`
   width: max-content;
   min-width: 700px;
   height: 100%;
-
   & > h3 {
     margin: 20px 0;
     font-size: ${(props) => props.theme.fontSizes[5]}px;
     font-weight: ${(props) => props.theme.fontWeights[2]};
     color: var(--ads-v2-color-fg-emphasis);
   }
+  overflow: hidden;
 `;
 
 const SettingsRowWrapper = styled.div`
   border-radius: var(--ads-v2-border-radius);
+  height: 100%;
   overflow: hidden;
+`;
+const SettingsHeaderWrapper = styled.div``;
+const SettingsBodyWrapper = styled.div`
+  overflow: auto;
+  max-height: calc(100% - 48px);
 `;
 
 function SettingsHeading({ grow, hasInfo, info, text }: SettingsHeadingProps) {
@@ -110,8 +127,12 @@ function SettingsHeading({ grow, hasInfo, info, text }: SettingsHeadingProps) {
   );
 }
 
-function SettingsItem({ action, disabled }: SettingsItemProps) {
-  const dispatch = useDispatch();
+function SettingsItem({
+  action,
+  disabled,
+  onUpdateSettings,
+  renderAdditionalColumns,
+}: SettingsItemProps) {
   const [executeOnPageLoad, setExecuteOnPageLoad] = useState(
     String(!!action.executeOnLoad),
   );
@@ -119,18 +140,13 @@ function SettingsItem({ action, disabled }: SettingsItemProps) {
     String(!!action.confirmBeforeExecute),
   );
 
-  const updateProperty = (value: boolean | number, propertyName: string) => {
-    dispatch(
-      updateFunctionProperty({
-        action: action,
-        propertyName: propertyName,
-        value: value,
-      }),
-    );
-  };
   const onChangeExecuteOnPageLoad = (value: string) => {
     setExecuteOnPageLoad(value);
-    updateProperty(value === "true", "executeOnLoad");
+    onUpdateSettings?.({
+      value: value === "true",
+      propertyName: "executeOnLoad",
+      action,
+    });
 
     AnalyticsUtil.logEvent("JS_OBJECT_SETTINGS_CHANGED", {
       toggleSetting: "ON_PAGE_LOAD",
@@ -139,7 +155,11 @@ function SettingsItem({ action, disabled }: SettingsItemProps) {
   };
   const onChangeConfirmBeforeExecute = (value: string) => {
     setConfirmBeforeExecute(value);
-    updateProperty(value === "true", "confirmBeforeExecute");
+    onUpdateSettings?.({
+      value: value === "true",
+      propertyName: "confirmBeforeExecute",
+      action,
+    });
 
     AnalyticsUtil.logEvent("JS_OBJECT_SETTINGS_CHANGED", {
       toggleSetting: "CONFIRM_BEFORE_RUN",
@@ -191,46 +211,55 @@ function SettingsItem({ action, disabled }: SettingsItemProps) {
           ))}
         </RadioGroup>
       </SettingColumn>
+      {renderAdditionalColumns?.(action)}
     </SettingRow>
   );
 }
 
 function JSFunctionSettingsView({
   actions,
+  additionalHeadings = [],
   disabled = false,
+  onUpdateSettings,
+  renderAdditionalColumns,
 }: JSFunctionSettingsProps) {
-  const asyncActions = actions.filter(
-    (action) => action.actionConfiguration.isAsync,
-  );
   return (
     <JSFunctionSettingsWrapper>
       <SettingsContainer>
-        <h3>{createMessage(ASYNC_FUNCTION_SETTINGS_HEADING)}</h3>
+        <h3>{createMessage(FUNCTION_SETTINGS_HEADING)}</h3>
         <SettingsRowWrapper>
-          <SettingRow isHeading>
-            {SETTINGS_HEADINGS.map((setting, index) => (
-              <SettingsHeading
-                grow={index === 0}
-                hasInfo={setting.hasInfo}
-                info={setting.info}
-                key={setting.key}
-                text={setting.text}
-              />
-            ))}
-          </SettingRow>
-          {asyncActions && asyncActions.length ? (
-            asyncActions.map((action) => (
-              <SettingsItem
-                action={action}
-                disabled={disabled}
-                key={action.id}
-              />
-            ))
-          ) : (
-            <SettingRow noBorder>
-              <SettingColumn>{createMessage(NO_ASYNC_FUNCTIONS)}</SettingColumn>
+          <SettingsHeaderWrapper>
+            <SettingRow isHeading>
+              {[...SETTINGS_HEADINGS, ...additionalHeadings].map(
+                (setting, index) => (
+                  <SettingsHeading
+                    grow={index === 0}
+                    hasInfo={setting.hasInfo}
+                    info={setting.info}
+                    key={setting.key}
+                    text={setting.text}
+                  />
+                ),
+              )}
             </SettingRow>
-          )}
+          </SettingsHeaderWrapper>
+          <SettingsBodyWrapper>
+            {actions && actions.length ? (
+              actions.map((action) => (
+                <SettingsItem
+                  action={action}
+                  disabled={disabled}
+                  key={action.id}
+                  onUpdateSettings={onUpdateSettings}
+                  renderAdditionalColumns={renderAdditionalColumns}
+                />
+              ))
+            ) : (
+              <SettingRow noBorder>
+                <SettingColumn>{createMessage(NO_JS_FUNCTIONS)}</SettingColumn>
+              </SettingRow>
+            )}
+          </SettingsBodyWrapper>
         </SettingsRowWrapper>
       </SettingsContainer>
     </JSFunctionSettingsWrapper>

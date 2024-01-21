@@ -1,15 +1,23 @@
 import * as _ from "../../../../support/Objects/ObjectsCore";
+import EditorNavigation, {
+  EntityType,
+  AppSidebarButton,
+  AppSidebar,
+} from "../../../../support/Pages/EditorNavigation";
+import PageList from "../../../../support/Pages/PageList";
 
 let repoName: any;
 let tempBranch: any;
 let statusBranch: any;
+let tempBranch1: any;
+let tempBranch2: any;
+let tempBranch3: any;
 
-describe("Git Bugs", function () {
+describe("Git Bugs", { tags: ["@tag.Git"] }, function () {
   before(() => {
-    _.homePage.NavigateToHome();
     _.agHelper.GenerateUUID();
     cy.get("@guid").then((uid) => {
-      _.homePage.CreateNewWorkspace("GitBugs" + uid);
+      _.homePage.CreateNewWorkspace("GitBugs" + uid, true);
       _.homePage.CreateAppInWorkspace("GitBugs" + uid);
     });
   });
@@ -17,7 +25,7 @@ describe("Git Bugs", function () {
   it("1. Bug 16248, When GitSync modal is open, block shortcut action execution", function () {
     const modifierKey = Cypress.platform === "darwin" ? "meta" : "ctrl";
     _.apiPage.CreateAndFillApi(
-      _.tedTestConfig.dsValues[_.tedTestConfig.defaultEnviorment].mockApiUrl,
+      _.dataManager.dsValues[_.dataManager.defaultEnviorment].mockApiUrl,
       "GitSyncTest",
     );
     _.gitSync.OpenGitSyncModal();
@@ -38,16 +46,17 @@ describe("Git Bugs", function () {
       _.dataSources.CreatePlugIn("PostgreSQL");
       _.dataSources.FillPostgresDSForm();
       _.dataSources.SaveDSFromDialog(false);
-      _.agHelper.AssertElementVisible(_.gitSync._branchButton);
+      _.agHelper.AssertElementVisibility(_.gitSync._branchButton);
       cy.get("@gitRepoName").then((repName) => {
         repoName = repName;
       });
     });
   });
+
   it("3. Bug 18376:  navigateTo fails to set queryParams if the app is connected to Git", () => {
-    _.entityExplorer.AddNewPage();
+    PageList.AddNewPage();
     _.entityExplorer.DragDropWidgetNVerify(_.draggableWidgets.TEXT);
-    _.entityExplorer.SelectEntityByName("Page1", "Pages");
+    EditorNavigation.SelectEntityByName("Page1", EntityType.Page);
     _.entityExplorer.DragDropWidgetNVerify(_.draggableWidgets.BUTTON);
     _.propPane.EnterJSContext(
       "onClick",
@@ -57,13 +66,13 @@ describe("Git Bugs", function () {
     );
     _.propPane.ToggleJSMode("onClick", false);
     _.agHelper.Sleep(500);
-    _.entityExplorer.SelectEntityByName("Page2", "Pages");
-    _.entityExplorer.SelectEntityByName("Text1", "Widgets");
+    EditorNavigation.SelectEntityByName("Page2", EntityType.Page);
+    EditorNavigation.SelectEntityByName("Text1", EntityType.Widget);
     _.propPane.UpdatePropertyFieldValue(
       "Text",
       "{{appsmith.URL.queryParams.testQP}}",
     );
-    _.entityExplorer.SelectEntityByName("Page1", "Pages");
+    EditorNavigation.SelectEntityByName("Page1", EntityType.Page);
     _.agHelper.ClickButton("Submit");
     _.agHelper.Sleep(500);
     _.agHelper
@@ -78,12 +87,11 @@ describe("Git Bugs", function () {
     _.gitSync.CreateGitBranch(`st`, true);
     cy.get("@gitbranchName").then((branchName) => {
       statusBranch = branchName;
-      _.agHelper.GetNClick(_.locators._appEditMenuBtn);
-      // cy.wait(_.locators._appEditMenu);
-      _.agHelper.GetNClick(_.locators._appEditMenuSettings);
+      AppSidebar.navigate(AppSidebarButton.Settings);
       _.agHelper.GetNClick(_.locators._appThemeSettings);
       _.agHelper.GetNClick(_.locators._appChangeThemeBtn, 0, true);
       _.agHelper.GetNClick(_.locators._appThemeCard, 2);
+      AppSidebar.navigate(AppSidebarButton.Editor);
       _.agHelper.GetNClick(_.locators._publishButton);
       _.agHelper.WaitUntilEleAppear(_.gitSync._gitStatusChanges);
       _.agHelper.AssertContains(
@@ -92,11 +100,10 @@ describe("Git Bugs", function () {
         _.gitSync._gitStatusChanges,
       );
       _.agHelper.GetNClick(_.locators._dialogCloseButton);
-      _.agHelper.GetNClick(_.locators._appEditMenuBtn);
-      // cy.wait(_.locators._appEditMenu);
-      _.agHelper.GetNClick(_.locators._appEditMenuSettings);
+      AppSidebar.navigate(AppSidebarButton.Settings);
       _.agHelper.GetNClick(_.locators._appNavigationSettings);
       _.agHelper.GetNClick(_.locators._appNavigationSettingsShowTitle);
+      AppSidebar.navigate(AppSidebarButton.Editor);
       _.agHelper.GetNClick(_.locators._publishButton);
       _.agHelper.WaitUntilEleAppear(_.gitSync._gitStatusChanges);
       _.agHelper.AssertContains(
@@ -113,10 +120,10 @@ describe("Git Bugs", function () {
     _.gitSync.CreateGitBranch(`b24946`, true);
     cy.get("@gitbranchName").then((branchName) => {
       statusBranch = branchName;
-      _.agHelper.GetNClick(_.locators._appEditMenuBtn);
-      _.agHelper.GetNClick(_.locators._appEditMenuSettings);
+      AppSidebar.navigate(AppSidebarButton.Settings);
       _.agHelper.GetNClick(_.locators._appNavigationSettings);
       _.agHelper.GetNClick(_.locators._appNavigationSettingsShowTitle);
+      AppSidebar.navigate(AppSidebarButton.Editor);
       _.agHelper.GetNClick(_.locators._publishButton);
       _.agHelper.WaitUntilEleAppear(_.gitSync._gitStatusChanges);
       _.agHelper.GetNClick(_.gitSync._discardChanges);
@@ -135,13 +142,50 @@ describe("Git Bugs", function () {
     });
   });
 
-  // skipping this test for now, will update test logic and create new PR for it
-  // TODO Parthvi
-  it.skip("6. Bug 24206 : Open repository button is not functional in git sync modal", function () {
+  it("6. Bug 24486 : Loading state for remote branches", function () {
+    _.gitSync.CreateRemoteBranch(repoName, "test-24486");
+    _.gitSync.SwitchGitBranch("origin/test-24486", false, true);
+  });
+
+  it("7. Bug 24920: Not able to discard app settings changes for the first time in git connected app ", function () {
+    _.gitSync.SwitchGitBranch("master", false, true);
+    // add navigation settings changes
+    AppSidebar.navigate(AppSidebarButton.Settings);
+    _.agHelper.GetNClick(_.appSettings.locators._navigationSettingsTab);
+    _.agHelper.GetNClick(
+      _.appSettings.locators._navigationSettings._orientationOptions._side,
+    );
+    _.agHelper.AssertElementExist(_.appSettings.locators._sideNavbar);
+    // discard changes and verify
+    _.gitSync.DiscardChanges();
+    _.gitSync.VerifyChangeLog(false);
+  });
+
+  it("8. Bug 23858 : Branch list in git sync modal is not scrollable", function () {
+    // create git branches
+    _.gitSync.CreateGitBranch(tempBranch1, true);
+    _.gitSync.CreateGitBranch(tempBranch2, true);
+    _.gitSync.CreateGitBranch(tempBranch3, true);
+    _.agHelper.AssertElementExist(_.gitSync._bottomBarPull);
+    _.agHelper.GetNClick(_.gitSync._bottomBarMergeButton);
+    _.agHelper.AssertElementEnabledDisabled(
+      _.gitSync._mergeBranchDropdownDestination,
+      0,
+      false,
+    );
+    _.agHelper.Sleep(6000); // adding wait for branch list to load
+    _.agHelper.GetNClick(_.gitSync._mergeBranchDropdownDestination);
+    // to verify scroll works and clicks on last branch in list
+    _.agHelper.GetNClick(_.gitSync._dropdownmenu, 5);
+    _.gitSync.CloseGitSyncModal();
+  });
+
+  it("9. Bug 24206 : Open repository button is not functional in git sync modal", function () {
     _.gitSync.SwitchGitBranch("master");
-    _.entityExplorer.DragDropWidgetNVerify("modalwidget", 50, 50);
+    _.appSettings.OpenPaneAndChangeTheme("Moon");
     _.gitSync.CommitAndPush();
     _.gitSync.SwitchGitBranch(tempBranch);
+    _.appSettings.OpenPaneAndChangeTheme("Pampas");
     _.gitSync.CommitAndPush();
     _.gitSync.CheckMergeConflicts("master");
     cy.window().then((win) => {
@@ -152,16 +196,6 @@ describe("Git Bugs", function () {
     _.gitSync.OpenRepositoryAndVerify();
     cy.get("@repoURL").should("be.called");
   });
-
-  // it.only("4. Import application json and validate headers", () => {
-  //   _.homePage.NavigateToHome();
-  //   _.homePage.ImportApp("DeleteGitRepos.json");
-  //   _.deployMode.DeployApp();
-  //   _.agHelper.Sleep(2000);
-  //   for (let i = 0; i < 100; i++) {
-  //     _.agHelper.ClickButton("Delete");
-  //   }
-  // });
 
   after(() => {
     _.gitSync.DeleteTestGithubRepo(repoName);

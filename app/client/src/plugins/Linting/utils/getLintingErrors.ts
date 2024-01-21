@@ -2,10 +2,14 @@ import type { Position } from "codemirror";
 import type { LintError } from "utils/DynamicBindingUtils";
 import { JSHINT as jshint } from "jshint";
 import type { LintError as JSHintError } from "jshint";
-import { isEmpty, isNumber, keys } from "lodash";
-import type { MemberExpressionData } from "@shared/ast";
+import { get, isEmpty, isNumber, keys } from "lodash";
+import type {
+  MemberExpressionData,
+  AssignmentExpressionData,
+} from "@shared/ast";
 import {
-  extractInvalidTopLevelMemberExpressionsFromCode,
+  extractExpressionsFromCode,
+  isIdentifierNode,
   isLiteralNode,
 } from "@shared/ast";
 import { PropertyEvaluationErrorType } from "utils/DynamicBindingUtils";
@@ -25,6 +29,10 @@ import { JSLibraries } from "workers/common/JSLibrary";
 import getLintSeverity from "./getLintSeverity";
 import { APPSMITH_GLOBAL_FUNCTIONS } from "components/editorComponents/ActionCreator/constants";
 import { last } from "lodash";
+import { isWidget } from "@appsmith/workers/Evaluation/evaluationUtils";
+import setters from "workers/Evaluation/setters";
+import { isMemberExpressionNode } from "@shared/ast/src";
+import { generate } from "astring";
 
 const EvaluationScriptPositions: Record<string, Position> = {};
 
@@ -185,39 +193,151 @@ export default function getLintingErrors({
       options?.isJsObject,
     ),
   );
-  const invalidPropertyErrors = getInvalidPropertyErrorsFromScript(
+  const customLintErrors = getCustomErrorsFromScript(
     script,
     data,
     scriptPos,
     originalBinding,
     options?.isJsObject,
   );
-  return jshintErrors.concat(invalidPropertyErrors);
+  return jshintErrors.concat(customLintErrors);
 }
 
-// returns lint errors caused by accessing invalid properties. Eg. jsObject.unknownProperty
-function getInvalidPropertyErrorsFromScript(
+function getInvalidWidgetPropertySetterErrors({
+  assignmentExpressions,
+  data,
+  originalBinding,
+  script,
+  scriptPos,
+}: {
+  data: Record<string, unknown>;
+  assignmentExpressions: AssignmentExpressionData[];
+  scriptPos: Position;
+  originalBinding: string;
+  script: string;
+}) {
+  const invalidWidgetPropertySetterErrors: LintError[] = [];
+  const setterAccessorMap = setters.getSetterAccessorMap();
+
+  for (const { object, parentNode, property } of assignmentExpressions) {
+    if (!isIdentifierNode(object)) continue;
+    const assignmentExpressionString = generate(parentNode);
+    const objectName = object.name;
+    const propertyName = isLiteralNode(property)
+      ? (property.value as string)
+      : property.name;
+
+    const entity = data[objectName];
+    if (!entity || !isWidget(entity)) continue;
+
+    const isValidProperty = propertyName in entity;
+
+    const methodName = get(setterAccessorMap, `${objectName}.${propertyName}`);
+
+    const lintErrorMessage = CUSTOM_LINT_ERRORS[
+      CustomLintErrorCode.INVALID_WIDGET_PROPERTY_SETTER
+    ](methodName, objectName, propertyName, isValidProperty);
+
+    // line position received after AST parsing is 1 more than the actual line of code, hence we subtract 1 to get the actual line number
+    const objectStartLine = object.loc.start.line - 1;
+
+    // AST parsing start column position from index 0 whereas codemirror start ch position from index 1, hence we add 1 to get the actual ch position
+    const objectStartCol = object.loc.start.column + 1;
+
+    invalidWidgetPropertySetterErrors.push({
+      errorType: PropertyEvaluationErrorType.LINT,
+      raw: script,
+      severity: getLintSeverity(
+        CustomLintErrorCode.INVALID_WIDGET_PROPERTY_SETTER,
+        lintErrorMessage,
+      ),
+      errorMessage: {
+        name: "LintingError",
+        message: lintErrorMessage,
+      },
+      errorSegment: assignmentExpressionString,
+      originalBinding,
+      variables: [assignmentExpressionString, null, null],
+      code: CustomLintErrorCode.INVALID_ENTITY_PROPERTY,
+      line: objectStartLine - scriptPos.line,
+      ch:
+        objectStartLine === scriptPos.line
+          ? objectStartCol - scriptPos.ch
+          : objectStartCol,
+    });
+  }
+  return invalidWidgetPropertySetterErrors;
+}
+
+function getInvalidAppsmithStoreSetterErrors({
+  assignmentExpressions,
+  originalBinding,
+  script,
+  scriptPos,
+}: {
+  data: Record<string, unknown>;
+  assignmentExpressions: AssignmentExpressionData[];
+  scriptPos: Position;
+  originalBinding: string;
+  script: string;
+}) {
+  const assignmentExpressionErrors: LintError[] = [];
+
+  for (const { object, parentNode } of assignmentExpressions) {
+    if (!isMemberExpressionNode(object)) continue;
+    const assignmentExpressionString = generate(parentNode);
+    if (!assignmentExpressionString.startsWith("appsmith.store")) continue;
+
+    const lintErrorMessage =
+      CUSTOM_LINT_ERRORS[
+        CustomLintErrorCode.INVALID_APPSMITH_STORE_PROPERTY_SETTER
+      ]();
+
+    // line position received after AST parsing is 1 more than the actual line of code, hence we subtract 1 to get the actual line number
+    const objectStartLine = object.loc.start.line - 1;
+
+    // AST parsing start column position from index 0 whereas codemirror start ch position from index 1, hence we add 1 to get the actual ch position
+    const objectStartCol = object.loc.start.column + 1;
+
+    assignmentExpressionErrors.push({
+      errorType: PropertyEvaluationErrorType.LINT,
+      raw: script,
+      severity: getLintSeverity(
+        CustomLintErrorCode.INVALID_APPSMITH_STORE_PROPERTY_SETTER,
+        lintErrorMessage,
+      ),
+      errorMessage: {
+        name: "LintingError",
+        message: lintErrorMessage,
+      },
+      errorSegment: assignmentExpressionString,
+      originalBinding,
+      variables: [assignmentExpressionString, null, null],
+      code: CustomLintErrorCode.INVALID_APPSMITH_STORE_PROPERTY_SETTER,
+      line: objectStartLine - scriptPos.line,
+      ch:
+        objectStartLine === scriptPos.line
+          ? objectStartCol - scriptPos.ch
+          : objectStartCol,
+    });
+  }
+  return assignmentExpressionErrors;
+}
+
+function getInvalidEntityPropertyErrors(
+  invalidTopLevelMemberExpressions: MemberExpressionData[],
   script: string,
   data: Record<string, unknown>,
   scriptPos: Position,
   originalBinding: string,
-  isJSObject = false,
-): LintError[] {
-  let invalidTopLevelMemberExpressions: MemberExpressionData[] = [];
-  try {
-    invalidTopLevelMemberExpressions =
-      extractInvalidTopLevelMemberExpressionsFromCode(
-        script,
-        data,
-        self.evaluationVersion,
-      );
-  } catch (e) {}
-
-  const invalidPropertyErrors = invalidTopLevelMemberExpressions.map(
+  isJSObject: boolean,
+) {
+  return invalidTopLevelMemberExpressions.map(
     ({ object, property }): LintError => {
       const propertyName = isLiteralNode(property)
         ? (property.value as string)
         : property.name;
+      // line position received after AST parsing is 1 more than the actual line of code, hence we subtract 1 to get the actual line number
       const objectStartLine = object.loc.start.line - 1;
       // For computed member expressions (entity["property"]), add an extra 1 to the start column to account for "[".
       const propertyStartColumn = !isLiteralNode(property)
@@ -249,7 +369,64 @@ function getInvalidPropertyErrorsFromScript(
       };
     },
   );
-  return invalidPropertyErrors;
+}
+
+// returns custom lint errors caused by
+// 1. accessing invalid properties. Eg. jsObject.unknownProperty
+// 2. direct mutation of widget properties. Eg. widget1.left = 10
+// 3. imperative update of appsmith store object. Eg. appsmith.store.val = 10
+function getCustomErrorsFromScript(
+  script: string,
+  data: Record<string, unknown>,
+  scriptPos: Position,
+  originalBinding: string,
+  isJSObject = false,
+): LintError[] {
+  let invalidTopLevelMemberExpressions: MemberExpressionData[] = [];
+  let assignmentExpressions: AssignmentExpressionData[] = [];
+  try {
+    const value = extractExpressionsFromCode(
+      script,
+      data,
+      self.evaluationVersion,
+    );
+    invalidTopLevelMemberExpressions =
+      value.invalidTopLevelMemberExpressionsArray;
+    assignmentExpressions = value.assignmentExpressionsData;
+  } catch (e) {}
+
+  const invalidWidgetPropertySetterErrors =
+    getInvalidWidgetPropertySetterErrors({
+      assignmentExpressions,
+      script,
+      scriptPos,
+      originalBinding,
+      data,
+    });
+
+  const invalidPropertyErrors = getInvalidEntityPropertyErrors(
+    invalidTopLevelMemberExpressions,
+    script,
+    data,
+    scriptPos,
+    originalBinding,
+    isJSObject,
+  );
+
+  const invalidAppsmithStorePropertyErrors =
+    getInvalidAppsmithStoreSetterErrors({
+      assignmentExpressions,
+      script,
+      scriptPos,
+      originalBinding,
+      data,
+    });
+
+  return [
+    ...invalidPropertyErrors,
+    ...invalidWidgetPropertySetterErrors,
+    ...invalidAppsmithStorePropertyErrors,
+  ];
 }
 
 function getRefinedW117Error(

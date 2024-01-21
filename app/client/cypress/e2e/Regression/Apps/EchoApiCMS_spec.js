@@ -6,23 +6,29 @@ import {
   gitSync,
   apiPage,
   dataSources,
+  dataManager,
 } from "../../../support/Objects/ObjectsCore";
+import EditorNavigation, {
+  EntityType,
+  PageLeftPane,
+  PagePaneSegment,
+} from "../../../support/Pages/EditorNavigation";
 
-describe("Content Management System App", function () {
-  before(() => {
-    homePage.NavigateToHome();
-    agHelper.GenerateUUID();
-    cy.get("@guid").then((uid) => {
-      homePage.CreateNewWorkspace("EchoApiCMS" + uid);
-      homePage.CreateAppInWorkspace("EchoApiCMS" + uid, "EchoApiCMSApp");
+describe(
+  "Content Management System App",
+  { tags: ["@tag.Datasource"] },
+  function () {
+    before(() => {
+      homePage.RenameApplication("EchoApiCMSApp");
       agHelper.AddDsl("CMSdsl");
     });
-  });
 
-  let repoName;
-  it("1.Create Get echo Api call", function () {
-    cy.fixture("datasources").then((datasourceFormData) => {
-      apiPage.CreateAndFillApi(datasourceFormData["echoApiUrl"], "get_data");
+    let repoName;
+    it("1.Create Get echo Api call", function () {
+      apiPage.CreateAndFillApi(
+        dataManager.dsValues[dataManager.defaultEnviorment].echoApiUrl,
+        "get_data",
+      );
       // creating get request using echo
       apiPage.EnterHeader(
         "info",
@@ -32,12 +38,10 @@ describe("Content Management System App", function () {
       apiPage.RunAPI();
       apiPage.ResponseStatusCheck("200");
     });
-  });
 
-  it("2. Create Post echo Api call", function () {
-    cy.fixture("datasources").then((datasourceFormData) => {
+    it("2. Create Post echo Api call", function () {
       apiPage.CreateAndFillApi(
-        datasourceFormData["echoApiUrl"],
+        dataManager.dsValues[dataManager.defaultEnviorment].echoApiUrl,
         "send_mail",
         10000,
         "POST",
@@ -51,12 +55,10 @@ describe("Content Management System App", function () {
       apiPage.RunAPI();
       apiPage.ResponseStatusCheck("200");
     });
-  });
 
-  it("3. Create Delete echo Api call", function () {
-    cy.fixture("datasources").then((datasourceFormData) => {
+    it("3. Create Delete echo Api call", function () {
       apiPage.CreateAndFillApi(
-        datasourceFormData["echoApiUrl"],
+        dataManager.dsValues[dataManager.defaultEnviorment].echoApiUrl,
         "delete_proposal",
         10000,
         "DELETE",
@@ -70,76 +72,68 @@ describe("Content Management System App", function () {
       apiPage.RunAPI();
       apiPage.ResponseStatusCheck("200");
     });
-  });
 
-  it("4. Send mail and verify post request body", function () {
-    // navigating to canvas
-    cy.xpath(appPage.pagebutton).click();
-    cy.get(appPage.submitButton).should("be.visible");
-    cy.xpath("//span[text()='3']").click({ force: true });
-    cy.get(appPage.mailButton).closest("div").click();
-    // verifying the mail to send and asserting post call's response
-    cy.xpath(appPage.sendMailText).should("be.visible");
-    cy.xpath("//input[@value='Curt50@gmail.com']").should("be.visible");
-    cy.xpath(appPage.subjectField).type("Test");
-    cy.get(appPage.contentField)
-      .last()
-      .find("textarea")
-      .type("Task completed", { force: true });
-    cy.get(appPage.confirmButton).closest("div").click({ force: true });
-    cy.get(appPage.closeButton).closest("div").click({ force: true });
-    cy.xpath(appPage.pagebutton).click({ force: true });
-    //cy.xpath(appPage.datasourcesbutton).click({ force: true });
-    cy.CheckAndUnfoldEntityItem("Queries/JS");
-    cy.xpath(appPage.postApi).click({ force: true });
-    cy.ResponseCheck("Test");
-    // cy.ResponseCheck("Task completed");
-    cy.ResponseCheck("Curt50@gmail.com");
-  });
-
-  it("5. Delete proposal and verify delete request body", function () {
-    // navigating back to canvas
-    cy.xpath(appPage.pagebutton).click({ force: true });
-    cy.get(appPage.submitButton).closest("div").should("be.visible");
-    cy.xpath("//span[text()='Dan.Wyman@hotmail.com']").click({ force: true });
-    // deleting the proposal and asserting delete call's response
-    cy.xpath(appPage.deleteButton).click({ force: true });
-    cy.xpath(appPage.deleteTaskText).should("be.visible");
-    cy.get(appPage.confirmButton).closest("div").click({ force: true });
-    cy.xpath(appPage.pagebutton).click({ force: true });
-    //cy.xpath(appPage.datasourcesbutton).click({ force: true });
-    cy.xpath(appPage.deleteApi).click({ force: true });
-    cy.ResponseCheck("Dan.Wyman@hotmail.com");
-    cy.ResponseCheck("Recusan");
-  });
-
-  it("6. Connect app to git, verify data binding in edit and deploy mode", () => {
-    cy.get(`.t--entity-name:contains("Page1")`)
-      .should("be.visible")
-      .click({ force: true });
-    gitSync.CreateNConnectToGit(repoName);
-    cy.get("@gitRepoName").then((repName) => {
-      repoName = repName;
+    it("4. Send mail and verify post request body", function () {
+      // navigating to canvas
+      cy.xpath(appPage.pagebutton).click();
+      cy.get(appPage.submitButton).should("be.visible");
+      cy.xpath("//span[text()='3']").click({ force: true });
+      cy.get(appPage.mailButton).closest("div").click();
+      // verifying the mail to send and asserting post call's response
+      cy.xpath(appPage.sendMailText).should("be.visible");
+      cy.xpath("//input[@value='Curt50@gmail.com']").should("be.visible");
+      cy.xpath(appPage.subjectField).type("Test");
+      cy.get(appPage.contentField)
+        .last()
+        .find("textarea")
+        .type("Task completed", { force: true });
+      cy.get(appPage.confirmButton).closest("div").click({ force: true });
+      cy.get(appPage.closeButton).closest("div").click({ force: true });
+      cy.xpath(appPage.pagebutton).click({ force: true });
+      PageLeftPane.switchSegment(PagePaneSegment.Queries);
+      cy.xpath(appPage.postApi).click({ force: true });
+      cy.ResponseCheck("Test");
+      // cy.ResponseCheck("Task completed");
+      cy.ResponseCheck("Curt50@gmail.com");
     });
-    cy.latestDeployPreview();
-    cy.wait(2000);
-    cy.xpath("//span[text()='Curt50@gmail.com']")
-      .should("be.visible")
-      .click({ force: true });
-    cy.get(appPage.mailButton).closest("div").click();
-    cy.xpath(appPage.sendMailText).should("be.visible");
-    cy.xpath(appPage.subjectField).type("Test");
-    cy.get(appPage.contentField)
-      .last()
-      .find("textarea")
-      .type("Task completed", { force: true });
-    cy.get(appPage.confirmButton).closest("div").click({ force: true });
-    cy.get(appPage.closeButton).closest("div").click({ force: true });
-    deployMode.NavigateBacktoEditor();
-  });
 
-  after(() => {
-    //clean up
-    gitSync.DeleteTestGithubRepo(repoName);
-  });
-});
+    it("5. Delete proposal and verify delete request body", function () {
+      // navigating back to canvas
+      cy.xpath(appPage.pagebutton).click({ force: true });
+      cy.get(appPage.submitButton).closest("div").should("be.visible");
+      cy.xpath("//span[text()='Dan.Wyman@hotmail.com']").click({ force: true });
+      // deleting the proposal and asserting delete call's response
+      cy.xpath(appPage.deleteButton).click({ force: true });
+      cy.xpath(appPage.deleteTaskText).should("be.visible");
+      cy.get(appPage.confirmButton).closest("div").click({ force: true });
+      cy.xpath(appPage.pagebutton).click({ force: true });
+      EditorNavigation.SelectEntityByName("delete_proposal", EntityType.Api);
+      cy.ResponseCheck("Dan.Wyman@hotmail.com");
+      cy.ResponseCheck("Recusan");
+    });
+
+    it("6. Connect app to git, verify data binding in edit and deploy mode", () => {
+      EditorNavigation.SelectEntityByName("Page1", EntityType.Page);
+      gitSync.CreateNConnectToGit(repoName);
+      cy.get("@gitRepoName").then((repName) => {
+        repoName = repName;
+
+        cy.latestDeployPreview();
+        cy.xpath("//span[text()='Curt50@gmail.com']")
+          .should("be.visible")
+          .click({ force: true });
+        cy.get(appPage.mailButton).closest("div").click();
+        cy.xpath(appPage.sendMailText).should("be.visible");
+        cy.xpath(appPage.subjectField).type("Test");
+        cy.get(appPage.contentField)
+          .last()
+          .find("textarea")
+          .type("Task completed", { force: true });
+        cy.get(appPage.confirmButton).closest("div").click({ force: true });
+        cy.get(appPage.closeButton).closest("div").click({ force: true });
+        deployMode.NavigateBacktoEditor();
+        gitSync.DeleteTestGithubRepo(repoName);
+      });
+    });
+  },
+);

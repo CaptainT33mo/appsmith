@@ -2,8 +2,12 @@ import { isPromise } from "workers/Evaluation/JSObject/utils";
 import { postJSFunctionExecutionLog } from "@appsmith/workers/Evaluation/JSObject/postJSFunctionExecution";
 import TriggerEmitter, { BatchKey } from "./TriggerEmitter";
 import ExecutionMetaData from "./ExecutionMetaData";
-import { TriggerKind } from "constants/AppsmithActionConstants/ActionConstants";
-
+function addMetaDataToError(e: any, fnName: string, fnString: string) {
+  // To account for cascaded errors, if error has a source, retain it
+  e.source = e.source || fnName;
+  e.userScript = e.userScript || fnString;
+  return e;
+}
 declare global {
   interface Window {
     structuredClone: (
@@ -12,11 +16,12 @@ declare global {
     ) => any;
   }
 }
-export type PostProcessorArg = {
+export interface PostProcessorArg {
   executionMetaData: ReturnType<typeof ExecutionMetaData.getExecutionMetaData>;
   jsFnFullName: string;
   executionResponse: unknown;
-};
+  isSuccess: boolean;
+}
 
 export type PostProcessor = (args: PostProcessorArg) => void;
 export interface JSExecutionData {
@@ -34,27 +39,24 @@ function saveExecutionData({
   });
 }
 
-function logJSExecution({ executionMetaData, jsFnFullName }: PostProcessorArg) {
-  switch (executionMetaData.triggerMeta.triggerKind) {
-    case TriggerKind.EVENT_EXECUTION: {
-      TriggerEmitter.emit(BatchKey.process_batched_fn_invoke_log, jsFnFullName);
-      break;
-    }
-    default: {
-      break;
-    }
-  }
-  postJSFunctionExecutionLog(jsFnFullName);
-}
-
 export function jsObjectFunctionFactory<P extends ReadonlyArray<unknown>>(
   fn: (...args: P) => unknown,
   name: string,
-  postProcessors: PostProcessor[] = [saveExecutionData, logJSExecution],
+  postProcessors: PostProcessor[] = [
+    saveExecutionData,
+    postJSFunctionExecutionLog,
+  ],
 ) {
   return function (this: unknown, ...args: P) {
     if (!ExecutionMetaData.getExecutionMetaData().enableJSFnPostProcessors) {
-      return fn.call(this, ...args);
+      let result;
+      try {
+        result = fn.call(this, ...args);
+        return result;
+      } catch (e: any) {
+        e = addMetaDataToError(e, name, fn.toString());
+        throw e;
+      }
     }
     const executionMetaData = ExecutionMetaData.getExecutionMetaData();
     try {
@@ -66,16 +68,19 @@ export function jsObjectFunctionFactory<P extends ReadonlyArray<unknown>>(
               executionMetaData,
               jsFnFullName: name,
               executionResponse: res,
+              isSuccess: true,
             }),
           );
           return res;
         });
         result.catch((e) => {
+          e = addMetaDataToError(e, name, fn.toString());
           postProcessors.forEach((p) =>
             p({
               executionMetaData,
               jsFnFullName: name,
               executionResponse: undefined,
+              isSuccess: true,
             }),
           );
           throw e;
@@ -86,16 +91,19 @@ export function jsObjectFunctionFactory<P extends ReadonlyArray<unknown>>(
             executionMetaData,
             jsFnFullName: name,
             executionResponse: result,
+            isSuccess: true,
           }),
         );
       }
       return result;
-    } catch (e) {
+    } catch (e: any) {
+      e = addMetaDataToError(e, name, fn.toString());
       postProcessors.forEach((postProcessor) => {
         postProcessor({
           executionMetaData,
           jsFnFullName: name,
           executionResponse: undefined,
+          isSuccess: false,
         });
       });
       throw e;

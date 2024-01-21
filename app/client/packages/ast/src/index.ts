@@ -2,10 +2,11 @@ import type { Node, SourceLocation, Options, Comment } from "acorn";
 import { parse } from "acorn";
 import { ancestor, simple } from "acorn-walk";
 import { ECMA_VERSION, NodeTypes } from "./constants";
-import { has, isFinite, isString, toPath } from "lodash";
-import { isTrueObject, sanitizeScript } from "./utils";
+import { has, isFinite, isNil, isString, toPath } from "lodash";
+import { getStringValue, isTrueObject, sanitizeScript } from "./utils";
 import { jsObjectDeclaration } from "./jsObject";
 import { attachComments } from "astravel";
+import { generate } from "astring";
 /*
  * Valuable links:
  *
@@ -142,12 +143,12 @@ export interface BlockStatementNode extends Node {
   body: [Node];
 }
 
-type NodeList = {
+interface NodeList {
   references: Set<string>;
   functionalParams: Set<string>;
   variableDeclarations: Set<string>;
   identifierList: Array<IdentifierNode>;
-};
+}
 
 // https://github.com/estree/estree/blob/master/es5.md#property
 export interface PropertyNode extends Node {
@@ -185,10 +186,10 @@ export type NodeWithLocation<NodeType> = NodeType & {
 
 type AstOptions = Omit<Options, "ecmaVersion">;
 
-type EntityRefactorResponse = {
+interface EntityRefactorResponse {
   isSuccess: boolean;
   body: { script: string; refactorCount: number } | { error: string };
-};
+}
 
 /* We need these functions to typescript casts the nodes with the correct types */
 export const isIdentifierNode = (node: Node): node is IdentifierNode => {
@@ -239,6 +240,12 @@ export const isArrowFunctionExpression = (
   node: Node,
 ): node is ArrowFunctionExpressionNode => {
   return node.type === NodeTypes.ArrowFunctionExpression;
+};
+
+export const isAssignmentExpression = (
+  node: Node,
+): node is AssignmentExpressionNode => {
+  return node.type === NodeTypes.AssignmentExpression;
 };
 
 export const isObjectExpression = (node: Node): node is ObjectExpression => {
@@ -501,7 +508,10 @@ export const entityRefactorFromCode = (
   }
 };
 
-export type functionParam = { paramName: string; defaultValue: unknown };
+export interface functionParam {
+  paramName: string;
+  defaultValue: unknown;
+}
 
 export const getFunctionalParamsFromNode = (
   node:
@@ -576,6 +586,18 @@ export interface MemberExpressionData {
   object: NodeWithLocation<IdentifierNode>;
 }
 
+export interface AssignmentExpressionData {
+  property: NodeWithLocation<IdentifierNode | LiteralNode>;
+  object: NodeWithLocation<IdentifierNode | MemberExpressionNode>;
+  parentNode: NodeWithLocation<AssignmentExpressionNode>;
+}
+
+export interface AssignmentExpressionNode extends Node {
+  operator: string;
+  left: Expression;
+  Right: Expression;
+}
+
 /** Function returns Invalid top-level member expressions from code
  * @param code
  * @param data
@@ -593,11 +615,15 @@ export interface MemberExpressionData {
  * },
  * For code {{Api1.name + JSObject.unknownProperty}}, function returns information about "JSObject.unknownProperty" node.
  */
-export const extractInvalidTopLevelMemberExpressionsFromCode = (
+export const extractExpressionsFromCode = (
   code: string,
   data: Record<string, any>,
   evaluationVersion: number,
-): MemberExpressionData[] => {
+): {
+  invalidTopLevelMemberExpressionsArray: MemberExpressionData[];
+  assignmentExpressionsData: AssignmentExpressionData[];
+} => {
+  const assignmentExpressionsData = new Set<AssignmentExpressionData>();
   const invalidTopLevelMemberExpressions = new Set<MemberExpressionData>();
   const variableDeclarations = new Set<string>();
   let functionalParams = new Set<string>();
@@ -609,13 +635,17 @@ export const extractInvalidTopLevelMemberExpressionsFromCode = (
   } catch (e) {
     if (e instanceof SyntaxError) {
       // Syntax error. Ignore and return empty list
-      return [];
+      return {
+        invalidTopLevelMemberExpressionsArray: [],
+        assignmentExpressionsData: [],
+      };
     }
     throw e;
   }
   simple(ast, {
     MemberExpression(node: Node) {
       const { computed, object, property } = node as MemberExpressionNode;
+
       // We are only interested in top-level MemberExpression nodes
       // Eg. for Api1.data.name, we are only interested in Api1.data
       if (!isIdentifierNode(object)) return;
@@ -671,6 +701,22 @@ export const extractInvalidTopLevelMemberExpressionsFromCode = (
         ...getFunctionalParamNamesFromNode(node),
       ]);
     },
+    AssignmentExpression(node: Node) {
+      if (
+        !isAssignmentExpression(node) ||
+        node.operator !== "=" ||
+        !isMemberExpressionNode(node.left)
+      )
+        return;
+
+      const { object, property } = node.left;
+
+      assignmentExpressionsData.add({
+        object,
+        property,
+        parentNode: node,
+      } as AssignmentExpressionData);
+    },
   });
 
   const invalidTopLevelMemberExpressionsArray = Array.from(
@@ -682,7 +728,10 @@ export const extractInvalidTopLevelMemberExpressionsFromCode = (
     );
   });
 
-  return invalidTopLevelMemberExpressionsArray;
+  return {
+    invalidTopLevelMemberExpressionsArray,
+    assignmentExpressionsData: [...assignmentExpressionsData],
+  };
 };
 
 const ancestorWalk = (ast: Node): NodeList => {
@@ -838,3 +887,34 @@ export const isFunctionPresent = (
     return false;
   }
 };
+
+export function getMemberExpressionObjectFromProperty(
+  propertyName: string,
+  code: string,
+  evaluationVersion = 2,
+) {
+  if (!propertyName) return [];
+  const memberExpressionObjects = new Set<string>();
+  let ast: Node = { end: 0, start: 0, type: "" };
+  try {
+    const sanitizedScript = sanitizeScript(code, evaluationVersion);
+    const wrappedCode = wrapCode(sanitizedScript);
+    ast = getAST(wrappedCode, { locations: true });
+    simple(ast, {
+      MemberExpression(node: Node) {
+        const { object, property } = node as MemberExpressionNode;
+        if (!isLiteralNode(property) && !isIdentifierNode(property)) return;
+        const propName = isLiteralNode(property)
+          ? property.value
+          : property.name;
+        if (!isNil(propName) && getStringValue(propName) === propertyName) {
+          const memberExpressionObjectString = generate(object);
+          memberExpressionObjects.add(memberExpressionObjectString);
+        }
+      },
+    });
+    return Array.from(memberExpressionObjects);
+  } catch (e) {
+    return [];
+  }
+}

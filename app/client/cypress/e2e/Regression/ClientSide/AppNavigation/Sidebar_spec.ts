@@ -6,17 +6,21 @@ import {
   assertHelper,
   locators,
 } from "../../../../support/Objects/ObjectsCore";
+import {
+  AppSidebar,
+  AppSidebarButton,
+} from "../../../../support/Pages/EditorNavigation";
 
-describe("Test Sidebar navigation style", function () {
+describe("Test Sidebar navigation style", { tags: ["@tag.IDE"] }, function () {
   before(() => {
     // Import an application
     homePage.NavigateToHome();
+    agHelper.RefreshPage();
     homePage.ImportApp("appNavigationTestingAppWithLongPageNamesAndTitle.json");
     assertHelper
       .WaitForNetworkCall("@importNewApplication")
-      .then((interception) => {
-        agHelper.Sleep();
-        const { isPartialImport } = interception.response.body.data;
+      .then((response) => {
+        const { isPartialImport } = response.body.data;
         if (isPartialImport) {
           homePage.AssertNCloseImport();
         } else {
@@ -26,7 +30,7 @@ describe("Test Sidebar navigation style", function () {
   });
 
   it("1. Change 'Orientation' to 'Side', sidebar should appear", () => {
-    agHelper.GetNClick(appSettings.locators._appSettings);
+    AppSidebar.navigate(AppSidebarButton.Settings);
     agHelper.GetNClick(appSettings.locators._navigationSettingsTab);
     agHelper.GetNClick(
       appSettings.locators._navigationSettings._orientationOptions._side,
@@ -34,7 +38,7 @@ describe("Test Sidebar navigation style", function () {
       true,
     );
     deployMode.DeployApp();
-    agHelper.AssertElementVisible(appSettings.locators._sideNavbar);
+    agHelper.AssertElementVisibility(appSettings.locators._sideNavbar);
     agHelper.AssertElementAbsence(appSettings.locators._topStacked);
     agHelper.AssertElementAbsence(appSettings.locators._topInline);
     //Page change should work
@@ -45,7 +49,7 @@ describe("Test Sidebar navigation style", function () {
       0,
       true,
     );
-    agHelper.AssertElementVisible(
+    agHelper.AssertElementVisibility(
       appSettings.locators._getActivePage(pageName),
     );
   });
@@ -60,7 +64,7 @@ describe("Test Sidebar navigation style", function () {
     );
     // Changing color style to theme should change navigation's background color
     deployMode.NavigateBacktoEditor();
-    agHelper.GetNClick(appSettings.locators._appSettings);
+    AppSidebar.navigate(AppSidebarButton.Settings);
     agHelper.GetNClick(appSettings.locators._navigationSettingsTab);
     agHelper.GetNClick(appSettings.locators._colorStyleOptions._theme, 0, true);
     deployMode.DeployApp();
@@ -71,10 +75,10 @@ describe("Test Sidebar navigation style", function () {
       0,
     );
     //Application name, share button, edit button, and user dropdown should be available in the app sidebar
-    agHelper.AssertElementVisible(appSettings.locators._applicationName);
-    agHelper.AssertElementVisible(appSettings.locators._shareButton);
-    agHelper.AssertElementVisible(locators._backToEditor);
-    agHelper.AssertElementVisible(homePage._profileMenu);
+    agHelper.AssertElementVisibility(appSettings.locators._applicationName);
+    agHelper.AssertElementVisibility(appSettings.locators._shareButton);
+    agHelper.AssertElementVisibility(locators._backToEditor);
+    agHelper.AssertElementVisibility(homePage._profileMenu);
   });
 
   it("3. Share button should open the share modal, edit button should take us back to the editor, and clicking on user profile button should open up the dropdown menu", () => {
@@ -82,12 +86,12 @@ describe("Test Sidebar navigation style", function () {
     agHelper.GetNClick(
       `${appSettings.locators._sideNavbar} ${appSettings.locators._shareButton}`,
     );
-    agHelper.Sleep(1000);
-    agHelper.AssertElementVisible(appSettings.locators._modal);
+    agHelper.WaitUntilEleAppear(appSettings.locators._modal);
+    agHelper.AssertElementVisibility(appSettings.locators._modal);
     agHelper.GetNClick(appSettings.locators._modalClose, 0, true);
     // User profile dropdown
     agHelper.GetNClick(homePage._profileMenu);
-    agHelper.AssertElementVisible(
+    agHelper.AssertElementVisibility(
       appSettings.locators._userProfileDropdownMenu,
     );
   });

@@ -2,7 +2,7 @@ import {
   ButtonBorderRadiusTypes,
   ButtonVariantTypes,
 } from "components/constants";
-import type { PropertyHookUpdates } from "constants/PropertyControlConstants";
+import type { PropertyUpdates } from "WidgetProvider/constants";
 import {
   RenderModes,
   TextSizes,
@@ -11,7 +11,7 @@ import {
 import { remove } from "lodash";
 import { getTheme, ThemeMode } from "selectors/themeSelectors";
 import type { WidgetProps } from "./BaseWidget";
-import { rgbaMigrationConstantV56 } from "./constants";
+import { rgbaMigrationConstantV56 } from "../WidgetProvider/constants";
 import {
   borderRadiusUtility,
   replaceRgbaMigrationConstant,
@@ -26,6 +26,7 @@ import {
   isAutoHeightEnabledForWidgetWithLimits,
   getWidgetMaxAutoHeight,
   getWidgetMinAutoHeight,
+  isCompactMode,
 } from "./WidgetUtils";
 import {
   getCustomTextColor,
@@ -437,7 +438,7 @@ type composePropertyUpdateHookInputType = Array<
     props: unknown,
     propertyPath: string,
     propertyValue: any,
-  ) => PropertyHookUpdates[] | undefined
+  ) => PropertyUpdates[] | undefined
 >;
 describe("composePropertyUpdateHook", () => {
   it("should test that it's returning a function", () => {
@@ -695,5 +696,11 @@ describe("Should Update Widget Height Automatically?", () => {
 
     const result = shouldUpdateWidgetHeightAutomatically(input, props);
     expect(result).toStrictEqual(expected);
+  });
+  it("should return correct value for isCompactMode", () => {
+    const compactHeight = 40;
+    const unCompactHeight = 41;
+    expect(isCompactMode(compactHeight)).toBeTruthy();
+    expect(isCompactMode(unCompactHeight)).toBeFalsy();
   });
 });

@@ -10,10 +10,8 @@ import {
   isTrueObject,
   isWidget,
 } from "@appsmith/workers/Evaluation/evaluationUtils";
-import type {
-  DataTreeEntity,
-  DataTreeEntityConfig,
-} from "entities/DataTree/dataTreeFactory";
+import type { DataTreeEntityConfig } from "@appsmith/entities/DataTree/types";
+import type { DataTreeEntity } from "entities/DataTree/dataTreeTypes";
 import { getType, Types } from "./TypeHelpers";
 import { ViewTypes } from "components/formControls/utils";
 
@@ -145,13 +143,14 @@ export enum EvalErrorTypes {
   PARSE_JS_ERROR = "PARSE_JS_ERROR",
   EXTRACT_DEPENDENCY_ERROR = "EXTRACT_DEPENDENCY_ERROR",
   CLONE_ERROR = "CLONE_ERROR",
+  SERIALIZATION_ERROR = "SERIALIZATION_ERROR",
 }
 
-export type EvalError = {
+export interface EvalError {
   type: EvalErrorTypes;
   message: string;
   context?: Record<string, any>;
-};
+}
 
 export interface DynamicPath {
   key: string;
@@ -273,9 +272,12 @@ export const unsafeFunctionForEval = [
 export const isChildPropertyPath = (
   parentPropertyPath: string,
   childPropertyPath: string,
+  // In non-strict mode, an exact match is treated as a child path
+  // Eg. "Api1" is a child property path of "Api1"
+  strict = false,
 ): boolean => {
   return (
-    parentPropertyPath === childPropertyPath ||
+    (!strict && parentPropertyPath === childPropertyPath) ||
     childPropertyPath.startsWith(`${parentPropertyPath}.`) ||
     childPropertyPath.startsWith(`${parentPropertyPath}[`)
   );
@@ -377,7 +379,7 @@ export enum PropertyEvaluationErrorType {
 }
 
 export enum PropertyEvaluationErrorCategory {
-  INVALID_JS_FUNCTION_INVOCATION_IN_DATA_FIELD = "INVALID_JS_FUNCTION_INVOCATION_IN_DATA_FIELD",
+  ACTION_INVOCATION_IN_DATA_FIELD = "ACTION_INVOCATION_IN_DATA_FIELD",
 }
 export interface PropertyEvaluationErrorKind {
   category: PropertyEvaluationErrorCategory;
@@ -395,7 +397,7 @@ export interface EvaluationError extends DataTreeError {
     | PropertyEvaluationErrorType.PARSE
     | PropertyEvaluationErrorType.VALIDATION;
   originalBinding?: string;
-  kind?: PropertyEvaluationErrorKind;
+  kind?: Partial<PropertyEvaluationErrorKind>;
 }
 
 export interface LintError extends DataTreeError {
@@ -468,7 +470,7 @@ export function getDynamicBindingsChangesSaga(
   if (
     action.datasource &&
     ("datasourceConfiguration" in action.datasource ||
-      "datasourceConfiguration" in formData?.datasource) &&
+      "datasourceConfiguration" in (formData?.datasource || {})) &&
     field === "datasource"
   ) {
     // only the datasource.datasourceConfiguration.url can be a dynamic field
@@ -512,6 +514,7 @@ export function getDynamicBindingsChangesSaga(
         const childPropertyValue = _.get(value, dynamicPath.key);
         return isDynamicValue(childPropertyValue);
       }
+      return !!dynamicPath;
     });
   } else if (typeof value === "string") {
     const fieldExists = _.some(dynamicBindings, { key: bindingField });

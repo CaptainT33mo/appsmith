@@ -1,16 +1,21 @@
 import { EventEmitter } from "events";
 import { MAIN_THREAD_ACTION } from "@appsmith/workers/Evaluation/evalWorkerActions";
 import { WorkerMessenger } from "workers/Evaluation/fns/utils/Messenger";
-import type {
-  Patch,
-  UpdatedPathsMap,
-} from "workers/Evaluation/JSObject/JSVariableUpdates";
+import type { UpdatedPathsMap } from "workers/Evaluation/JSObject/JSVariableUpdates";
 import { applyJSVariableUpdatesToEvalTree } from "workers/Evaluation/JSObject/JSVariableUpdates";
 import ExecutionMetaData from "./ExecutionMetaData";
 import { get } from "lodash";
 import { getType } from "utils/TypeHelpers";
 import type { JSVarMutatedEvents } from "workers/Evaluation/types";
 import { dataTreeEvaluator } from "workers/Evaluation/handlers/evalTree";
+import type {
+  TriggerKind,
+  TriggerSource,
+} from "constants/AppsmithActionConstants/ActionConstants";
+import type { UpdateActionProps } from "workers/Evaluation/handlers/updateActionData";
+import { handleActionsDataUpdate } from "workers/Evaluation/handlers/updateActionData";
+import { getEntityNameAndPropertyPath } from "@appsmith/workers/Evaluation/evaluationUtils";
+import type { Patch } from "workers/Evaluation/JSObject/Collection";
 
 const _internalSetTimeout = self.setTimeout;
 const _internalClearTimeout = self.clearTimeout;
@@ -99,7 +104,7 @@ const defaultTriggerHandler = priorityBatchedActionHandler((batchedData) => {
 
 TriggerEmitter.on(BatchKey.process_batched_triggers, defaultTriggerHandler);
 
-const fnExecutionDataHandler = priorityBatchedActionHandler((data) => {
+const fnExecutionDataHandler = deferredBatchedActionHandler((data) => {
   const batchedData = data.reduce<{
     JSExecutionData: Record<string, any>;
     JSExecutionErrors: Record<string, any>;
@@ -118,6 +123,20 @@ const fnExecutionDataHandler = priorityBatchedActionHandler((data) => {
     },
     { JSExecutionData: {}, JSExecutionErrors: {} },
   );
+
+  const updateActionProps: UpdateActionProps[] = Object.entries(
+    batchedData.JSExecutionData,
+  ).map(([jsFnFullName, data]) => {
+    const { entityName, propertyPath: funcName } =
+      getEntityNameAndPropertyPath(jsFnFullName);
+    return {
+      entityName,
+      dataPath: `${funcName}.data`,
+      data,
+    };
+  });
+
+  handleActionsDataUpdate(updateActionProps);
 
   WorkerMessenger.ping({
     method: MAIN_THREAD_ACTION.PROCESS_JS_FUNCTION_EXECUTION,
@@ -182,15 +201,20 @@ TriggerEmitter.on(
   jsVariableUpdatesHandlerWrapper,
 );
 
-export const fnInvokeLogHandler = priorityBatchedActionHandler<string>(
-  (data) => {
-    const set = new Set([...data]);
-    WorkerMessenger.ping({
-      method: MAIN_THREAD_ACTION.LOG_JS_FUNCTION_EXECUTION,
-      data: [...set],
-    });
-  },
-);
+export const fnInvokeLogHandler = deferredBatchedActionHandler<{
+  jsFnFullName: string;
+  isSuccess: boolean;
+  triggerMeta: {
+    source: TriggerSource;
+    triggerPropertyName: string | undefined;
+    triggerKind: TriggerKind | undefined;
+  };
+}>((data) => {
+  WorkerMessenger.ping({
+    method: MAIN_THREAD_ACTION.LOG_JS_FUNCTION_EXECUTION,
+    data,
+  });
+});
 
 TriggerEmitter.on(BatchKey.process_batched_fn_invoke_log, fnInvokeLogHandler);
 

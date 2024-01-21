@@ -1,25 +1,32 @@
 package com.appsmith.server.services;
 
+import com.appsmith.external.dtos.DslExecutableDTO;
 import com.appsmith.external.models.ActionConfiguration;
 import com.appsmith.external.models.ActionDTO;
+import com.appsmith.external.models.CreatorContextType;
 import com.appsmith.external.models.Datasource;
 import com.appsmith.external.models.PluginType;
 import com.appsmith.external.models.Property;
 import com.appsmith.server.acl.AclPermission;
+import com.appsmith.server.applications.base.ApplicationService;
 import com.appsmith.server.constants.FieldName;
 import com.appsmith.server.domains.Application;
 import com.appsmith.server.domains.Layout;
 import com.appsmith.server.domains.Plugin;
 import com.appsmith.server.domains.User;
 import com.appsmith.server.domains.Workspace;
-import com.appsmith.server.dtos.DslActionDTO;
 import com.appsmith.server.dtos.LayoutDTO;
 import com.appsmith.server.dtos.PageDTO;
 import com.appsmith.server.exceptions.AppsmithError;
 import com.appsmith.server.exceptions.AppsmithException;
 import com.appsmith.server.helpers.MockPluginExecutor;
 import com.appsmith.server.helpers.PluginExecutorHelper;
+import com.appsmith.server.layouts.UpdateLayoutService;
+import com.appsmith.server.newactions.base.NewActionService;
+import com.appsmith.server.newpages.base.NewPageService;
+import com.appsmith.server.repositories.CacheableRepositoryHelper;
 import com.appsmith.server.repositories.PluginRepository;
+import com.appsmith.server.solutions.ApplicationPermission;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -68,6 +75,9 @@ public class LayoutServiceTest {
     LayoutActionService layoutActionService;
 
     @Autowired
+    UpdateLayoutService updateLayoutService;
+
+    @Autowired
     ApplicationPageService applicationPageService;
 
     @Autowired
@@ -85,6 +95,18 @@ public class LayoutServiceTest {
     @Autowired
     NewPageService newPageService;
 
+    @Autowired
+    ApplicationService applicationService;
+
+    @Autowired
+    ApplicationPermission applicationPermission;
+
+    @Autowired
+    SessionUserService sessionUserService;
+
+    @Autowired
+    CacheableRepositoryHelper cacheableRepositoryHelper;
+
     @MockBean
     PluginExecutorHelper pluginExecutorHelper;
 
@@ -98,16 +120,27 @@ public class LayoutServiceTest {
     AstService astService;
 
     @BeforeEach
-    @WithUserDetails(value = "api_user")
     public void setup() {
+        User currentUser = sessionUserService.getCurrentUser().block();
         purgeAllPages();
         User apiUser = userService.findByEmail("api_user").block();
         Workspace toCreate = new Workspace();
         toCreate.setName("LayoutServiceTest");
+        Set<String> beforeCreatingWorkspace =
+                cacheableRepositoryHelper.getPermissionGroupsOfUser(currentUser).block();
+        log.info("Permission Groups for User before creating workspace: {}", beforeCreatingWorkspace);
 
         Workspace workspace =
                 workspaceService.create(toCreate, apiUser, Boolean.FALSE).block();
         workspaceId = workspace.getId();
+        Set<String> afterCreatingWorkspace =
+                cacheableRepositoryHelper.getPermissionGroupsOfUser(currentUser).block();
+        log.info("Permission Groups for User after creating workspace: {}", afterCreatingWorkspace);
+
+        log.info("Workspace ID: {}", workspaceId);
+        log.info("Workspace Role Ids: {}", workspace.getDefaultPermissionGroups());
+        log.info("Policy for created Workspace: {}", workspace.getPolicies());
+        log.info("Current User ID: {}", currentUser.getId());
 
         datasource = new Datasource();
         datasource.setName("Default Database");
@@ -117,6 +150,16 @@ public class LayoutServiceTest {
         installedJsPlugin =
                 pluginRepository.findByPackageName("installed-js-plugin").block();
         datasource.setPluginId(installedPlugin.getId());
+    }
+
+    @AfterEach
+    public void cleanup() {
+        List<Application> deletedApplications = applicationService
+                .findByWorkspaceId(workspaceId, applicationPermission.getDeletePermission())
+                .flatMap(remainingApplication -> applicationPageService.deleteApplication(remainingApplication.getId()))
+                .collectList()
+                .block();
+        Workspace deletedWorkspace = workspaceService.archiveById(workspaceId).block();
     }
 
     private void purgeAllPages() {
@@ -181,15 +224,13 @@ public class LayoutServiceTest {
     }
 
     private Mono<PageDTO> createPage(Application app, PageDTO page) {
-        return newPageService
-                .findByNameAndViewMode(page.getName(), AclPermission.READ_PAGES, false)
-                .switchIfEmpty(applicationPageService
-                        .createApplication(app, workspaceId)
-                        .map(application -> {
-                            page.setApplicationId(application.getId());
-                            return page;
-                        })
-                        .flatMap(applicationPageService::createPage));
+        return applicationPageService
+                .createApplication(app, workspaceId)
+                .map(application -> {
+                    page.setApplicationId(application.getId());
+                    return page;
+                })
+                .flatMap(applicationPageService::createPage);
     }
 
     @Test
@@ -215,7 +256,7 @@ public class LayoutServiceTest {
         Layout startLayout =
                 layoutService.createLayout(page.getId(), testLayout).block();
 
-        Mono<LayoutDTO> updatedLayoutMono = layoutActionService.updateLayout(
+        Mono<LayoutDTO> updatedLayoutMono = updateLayoutService.updateLayout(
                 "random-impossible-id-page", page.getApplicationId(), startLayout.getId(), updateLayout);
 
         StepVerifier.create(updatedLayoutMono)
@@ -251,7 +292,7 @@ public class LayoutServiceTest {
         Layout startLayout =
                 layoutService.createLayout(page.getId(), testLayout).block();
 
-        Mono<LayoutDTO> updatedLayoutMono = layoutActionService.updateLayout(
+        Mono<LayoutDTO> updatedLayoutMono = updateLayoutService.updateLayout(
                 page.getId(), "random-impossible-id-app", startLayout.getId(), updateLayout);
 
         StepVerifier.create(updatedLayoutMono)
@@ -290,7 +331,7 @@ public class LayoutServiceTest {
             PageDTO page = tuple.getT1();
             Layout startLayout = tuple.getT2();
             startLayout.setDsl(obj1);
-            return layoutActionService.updateLayout(
+            return updateLayoutService.updateLayout(
                     page.getId(), page.getApplicationId(), startLayout.getId(), startLayout);
         });
 
@@ -418,7 +459,6 @@ public class LayoutServiceTest {
                     action.setFullyQualifiedName("Collection.anAsyncCollectionActionWithoutCall");
                     final ActionConfiguration ac1 = new ActionConfiguration();
                     ac1.setBody("hiddenAction1.data");
-                    ac1.setIsAsync(true);
                     action.setActionConfiguration(ac1);
                     action.setDatasource(d2);
                     action.setPageId(page1.getId());
@@ -437,7 +477,6 @@ public class LayoutServiceTest {
                     action.setFullyQualifiedName("Collection.aSyncCollectionActionWithoutCall");
                     final ActionConfiguration ac2 = new ActionConfiguration();
                     ac2.setBody("hiddenAction2.data");
-                    ac2.setIsAsync(false);
                     action.setActionConfiguration(ac2);
                     action.setDatasource(d2);
                     action.setPageId(page1.getId());
@@ -457,7 +496,6 @@ public class LayoutServiceTest {
                     action.setDynamicBindingPathList(List.of(new Property("body", null)));
                     final ActionConfiguration ac3 = new ActionConfiguration();
                     ac3.setBody("hiddenAction3.data");
-                    ac3.setIsAsync(true);
                     action.setActionConfiguration(ac3);
                     action.setDatasource(d2);
                     action.setPageId(page1.getId());
@@ -476,7 +514,6 @@ public class LayoutServiceTest {
                     action.setFullyQualifiedName("Collection.aSyncCollectionActionWithCall");
                     final ActionConfiguration ac4 = new ActionConfiguration();
                     ac4.setBody("hiddenAction4.data");
-                    ac4.setIsAsync(false);
                     action.setActionConfiguration(ac4);
                     action.setDatasource(d2);
                     action.setPageId(page1.getId());
@@ -540,21 +577,27 @@ public class LayoutServiceTest {
                     Layout newLayout = new Layout();
 
                     JSONObject obj = new JSONObject(Map.of(
-                            "widgetName", "testWidget",
-                            "key", "value-updated",
-                            "another", "Hello people of the {{input1.text}} planet!",
-                            "dynamicGet", "some dynamic {{\"anIgnoredAction.data:\" + aGetAction.data}}",
+                            "widgetName",
+                            "testWidget",
+                            "key",
+                            "value-updated",
+                            "another",
+                            "Hello people of the {{input1.text}} planet!",
+                            "dynamicGet",
+                            "some dynamic {{\"anIgnoredAction.data:\" + aGetAction.data}}",
                             "dynamicPost",
-                                    "some dynamic {{\n" + "(function(ignoredAction1){\n"
-                                            + "\tlet a = ignoredAction1.data\n"
-                                            + "\tlet ignoredAction2 = { data: \"nothing\" }\n"
-                                            + "\tlet b = ignoredAction2.data\n"
-                                            + "\tlet c = \"ignoredAction3.data\"\n"
-                                            + "\t// ignoredAction4.data\n"
-                                            + "\treturn aPostAction.data\n"
-                                            + "})(anotherPostAction.data)}}",
-                            "dynamicPostWithAutoExec", "some dynamic {{aPostActionWithAutoExec.data}}",
-                            "dynamicDelete", "some dynamic {{aDeleteAction.data}}"));
+                            "some dynamic {{\n" + "(function(ignoredAction1){\n"
+                                    + "\tlet a = ignoredAction1.data\n"
+                                    + "\tlet ignoredAction2 = { data: \"nothing\" }\n"
+                                    + "\tlet b = ignoredAction2.data\n"
+                                    + "\tlet c = \"ignoredAction3.data\"\n"
+                                    + "\t// ignoredAction4.data\n"
+                                    + "\treturn aPostAction.data\n"
+                                    + "})(anotherPostAction.data)}}",
+                            "dynamicPostWithAutoExec",
+                            "some dynamic {{aPostActionWithAutoExec.data}}",
+                            "dynamicDelete",
+                            "some dynamic {{aDeleteAction.data}}"));
                     obj.putAll(Map.of(
                             "collection1Key", "some dynamic {{Collection.anAsyncCollectionActionWithoutCall.data}}",
                             "collection2Key", "some dynamic {{Collection.aSyncCollectionActionWithoutCall.data}}",
@@ -585,7 +628,7 @@ public class LayoutServiceTest {
                     obj.put("dynamicBindingPathList", dynamicBindingsPathList);
                     newLayout.setDsl(obj);
 
-                    return layoutActionService.updateLayout(
+                    return updateLayoutService.updateLayout(
                             page1.getId(), page1.getApplicationId(), layout.getId(), newLayout);
                 });
 
@@ -638,13 +681,14 @@ public class LayoutServiceTest {
                     monos.add(layoutActionService.createSingleAction(action, Boolean.FALSE));
 
                     // Create an async function for: Collection.anAsyncCollectionActionWithoutCall.data
+                    // This definition is the same as sync functions moving forward,
+                    // But we are retaining the test to make sure we consider the use case in the future as well
                     action = new ActionDTO();
                     action.setName("anAsyncCollectionActionWithoutCall");
                     action.setFullyQualifiedName("Collection.anAsyncCollectionActionWithoutCall");
                     action.setDynamicBindingPathList(List.of(new Property("body", null)));
                     final ActionConfiguration ac1 = new ActionConfiguration();
                     ac1.setBody("hiddenAction1.data");
-                    ac1.setIsAsync(true);
                     action.setActionConfiguration(ac1);
                     action.setDatasource(d2);
                     action.setPageId(page1.getId());
@@ -665,7 +709,6 @@ public class LayoutServiceTest {
                     action.setDynamicBindingPathList(List.of(new Property("body", null)));
                     final ActionConfiguration ac2 = new ActionConfiguration();
                     ac2.setBody("hiddenAction2.data");
-                    ac2.setIsAsync(false);
                     action.setActionConfiguration(ac2);
                     action.setDatasource(d2);
                     action.setPageId(page1.getId());
@@ -680,13 +723,14 @@ public class LayoutServiceTest {
                     monos.add(layoutActionService.createSingleAction(action, Boolean.FALSE));
 
                     // Create an async function for: Collection.anAsyncCollectionActionWithCall()
+                    // This definition is the same as sync functions moving forward,
+                    // But we are retaining the test to make sure we consider the use case in the future as well
                     action = new ActionDTO();
                     action.setName("anAsyncCollectionActionWithCall");
                     action.setFullyQualifiedName("Collection.anAsyncCollectionActionWithCall");
                     action.setDynamicBindingPathList(List.of(new Property("body", null)));
                     final ActionConfiguration ac3 = new ActionConfiguration();
                     ac3.setBody("hiddenAction3.data");
-                    ac3.setIsAsync(true);
                     action.setActionConfiguration(ac3);
                     action.setDatasource(d2);
                     action.setPageId(page1.getId());
@@ -706,7 +750,6 @@ public class LayoutServiceTest {
                     action.setFullyQualifiedName("Collection.aSyncCollectionActionWithCall");
                     final ActionConfiguration ac4 = new ActionConfiguration();
                     ac4.setBody("hiddenAction4.data");
-                    ac4.setIsAsync(false);
                     action.setActionConfiguration(ac4);
                     action.setDatasource(d2);
                     action.setPageId(page1.getId());
@@ -726,7 +769,6 @@ public class LayoutServiceTest {
                     action.setFullyQualifiedName("Collection.data");
                     final ActionConfiguration ac5 = new ActionConfiguration();
                     ac5.setBody("hiddenAction5.data");
-                    ac5.setIsAsync(false);
                     action.setActionConfiguration(ac5);
                     action.setDatasource(d2);
                     action.setPageId(page1.getId());
@@ -746,7 +788,6 @@ public class LayoutServiceTest {
                     action.setFullyQualifiedName("Collection2.data");
                     final ActionConfiguration ac6 = new ActionConfiguration();
                     ac6.setBody("hiddenAction6.data");
-                    ac6.setIsAsync(true);
                     action.setActionConfiguration(ac6);
                     action.setDatasource(d2);
                     action.setPageId(page1.getId());
@@ -796,7 +837,7 @@ public class LayoutServiceTest {
                     obj.put("dynamicBindingPathList", dynamicBindingsPathList);
                     newLayout.setDsl(obj);
 
-                    return layoutActionService.updateLayout(
+                    return updateLayoutService.updateLayout(
                             page1.getId(), page1.getApplicationId(), layout.getId(), newLayout);
                 });
 
@@ -874,30 +915,38 @@ public class LayoutServiceTest {
                     assertThat(layout.getId()).isNotNull();
                     assertThat(layout.getLayoutOnLoadActions()).hasSize(3);
 
-                    Set<String> firstSetPageLoadActions =
-                            Set.of("aGetAction", "hiddenAction1", "hiddenAction2", "hiddenAction4", "hiddenAction5");
+                    Set<String> firstSetPageLoadActions = Set.of(
+                            "aGetAction",
+                            "hiddenAction1",
+                            "hiddenAction2",
+                            "hiddenAction3",
+                            "hiddenAction4",
+                            "hiddenAction5",
+                            "hiddenAction6");
 
                     Set<String> secondSetPageLoadActions = Set.of("aPostAction");
 
-                    Set<String> thirdSetPageLoadActions = Set.of("Collection.anAsyncCollectionActionWithoutCall");
+                    Set<String> thirdSetPageLoadActions = Set.of(
+                            "Collection.anAsyncCollectionActionWithoutCall",
+                            "Collection.aSyncCollectionActionWithoutCall");
 
                     assertThat(layout.getLayoutOnLoadActions().get(0).stream()
-                                    .map(DslActionDTO::getName)
+                                    .map(DslExecutableDTO::getName)
                                     .collect(Collectors.toSet()))
                             .hasSameElementsAs(firstSetPageLoadActions);
                     assertThat(layout.getLayoutOnLoadActions().get(1).stream()
-                                    .map(DslActionDTO::getName)
+                                    .map(DslExecutableDTO::getName)
                                     .collect(Collectors.toSet()))
                             .hasSameElementsAs(secondSetPageLoadActions);
                     assertThat(layout.getLayoutOnLoadActions().get(2).stream()
-                                    .map(DslActionDTO::getName)
+                                    .map(DslExecutableDTO::getName)
                                     .collect(Collectors.toSet()))
                             .hasSameElementsAs(thirdSetPageLoadActions);
-                    Set<DslActionDTO> flatOnLoadActions = new HashSet<>();
-                    for (Set<DslActionDTO> actions : layout.getLayoutOnLoadActions()) {
+                    Set<DslExecutableDTO> flatOnLoadActions = new HashSet<>();
+                    for (Set<DslExecutableDTO> actions : layout.getLayoutOnLoadActions()) {
                         flatOnLoadActions.addAll(actions);
                     }
-                    for (DslActionDTO action : flatOnLoadActions) {
+                    for (DslExecutableDTO action : flatOnLoadActions) {
                         assertThat(action.getId()).isNotBlank();
                         assertThat(action.getName()).isNotBlank();
                         assertThat(action.getTimeoutInMillisecond()).isNotZero();
@@ -915,7 +964,7 @@ public class LayoutServiceTest {
         StepVerifier.create(actionDTOMono)
                 .assertNext(tuple -> {
                     assertThat(tuple.getT1().getExecuteOnLoad()).isTrue();
-                    assertThat(tuple.getT2().getExecuteOnLoad()).isNotEqualTo(Boolean.TRUE);
+                    assertThat(tuple.getT2().getExecuteOnLoad()).isTrue();
                 })
                 .verifyComplete();
     }
@@ -1027,6 +1076,7 @@ public class LayoutServiceTest {
                             "aGetAction",
                             "hiddenAction1",
                             "hiddenAction2",
+                            "hiddenAction3",
                             "hiddenAction4",
                             "aPostAction",
                             "anotherPostAction");
@@ -1035,29 +1085,31 @@ public class LayoutServiceTest {
 
                     Set<String> thirdSetPageLoadActions = Set.of("aDBAction");
 
-                    Set<String> fourthSetPageLoadActions =
-                            Set.of("aPostActionWithAutoExec", "Collection.anAsyncCollectionActionWithoutCall");
+                    Set<String> fourthSetPageLoadActions = Set.of(
+                            "aPostActionWithAutoExec",
+                            "Collection.anAsyncCollectionActionWithoutCall",
+                            "Collection.aSyncCollectionActionWithoutCall");
                     assertThat(layout.getLayoutOnLoadActions().get(0).stream()
-                                    .map(DslActionDTO::getName)
+                                    .map(DslExecutableDTO::getName)
                                     .collect(Collectors.toSet()))
                             .hasSameElementsAs(firstSetPageLoadActions);
                     assertThat(layout.getLayoutOnLoadActions().get(1).stream()
-                                    .map(DslActionDTO::getName)
+                                    .map(DslExecutableDTO::getName)
                                     .collect(Collectors.toSet()))
                             .hasSameElementsAs(secondSetPageLoadActions);
                     assertThat(layout.getLayoutOnLoadActions().get(2).stream()
-                                    .map(DslActionDTO::getName)
+                                    .map(DslExecutableDTO::getName)
                                     .collect(Collectors.toSet()))
                             .hasSameElementsAs(thirdSetPageLoadActions);
                     assertThat(layout.getLayoutOnLoadActions().get(3).stream()
-                                    .map(DslActionDTO::getName)
+                                    .map(DslExecutableDTO::getName)
                                     .collect(Collectors.toSet()))
                             .hasSameElementsAs(fourthSetPageLoadActions);
-                    Set<DslActionDTO> flatOnLoadActions = new HashSet<>();
-                    for (Set<DslActionDTO> actions : layout.getLayoutOnLoadActions()) {
+                    Set<DslExecutableDTO> flatOnLoadActions = new HashSet<>();
+                    for (Set<DslExecutableDTO> actions : layout.getLayoutOnLoadActions()) {
                         flatOnLoadActions.addAll(actions);
                     }
-                    for (DslActionDTO action : flatOnLoadActions) {
+                    for (DslExecutableDTO action : flatOnLoadActions) {
                         assertThat(action.getId()).isNotBlank();
                         assertThat(action.getName()).isNotBlank();
                         assertThat(action.getTimeoutInMillisecond()).isNotZero();
@@ -1124,6 +1176,7 @@ public class LayoutServiceTest {
                             "aGetAction",
                             "hiddenAction1",
                             "hiddenAction2",
+                            "hiddenAction3",
                             "hiddenAction4",
                             "anIgnoredAction",
                             "aDBAction",
@@ -1136,25 +1189,27 @@ public class LayoutServiceTest {
 
                     Set<String> secondSetPageLoadActions = Set.of("aTableAction", "anotherDBAction");
 
-                    Set<String> thirdSetPageLoadActions =
-                            Set.of("aPostActionWithAutoExec", "Collection.anAsyncCollectionActionWithoutCall");
+                    Set<String> thirdSetPageLoadActions = Set.of(
+                            "aPostActionWithAutoExec",
+                            "Collection.anAsyncCollectionActionWithoutCall",
+                            "Collection.aSyncCollectionActionWithoutCall");
                     assertThat(layout.getLayoutOnLoadActions().get(0).stream()
-                                    .map(DslActionDTO::getName)
+                                    .map(DslExecutableDTO::getName)
                                     .collect(Collectors.toSet()))
                             .hasSameElementsAs(firstSetPageLoadActions);
                     assertThat(layout.getLayoutOnLoadActions().get(1).stream()
-                                    .map(DslActionDTO::getName)
+                                    .map(DslExecutableDTO::getName)
                                     .collect(Collectors.toSet()))
                             .hasSameElementsAs(secondSetPageLoadActions);
                     assertThat(layout.getLayoutOnLoadActions().get(2).stream()
-                                    .map(DslActionDTO::getName)
+                                    .map(DslExecutableDTO::getName)
                                     .collect(Collectors.toSet()))
                             .hasSameElementsAs(thirdSetPageLoadActions);
-                    Set<DslActionDTO> flatOnLoadActions = new HashSet<>();
-                    for (Set<DslActionDTO> actions : layout.getLayoutOnLoadActions()) {
+                    Set<DslExecutableDTO> flatOnLoadActions = new HashSet<>();
+                    for (Set<DslExecutableDTO> actions : layout.getLayoutOnLoadActions()) {
                         flatOnLoadActions.addAll(actions);
                     }
-                    for (DslActionDTO action : flatOnLoadActions) {
+                    for (DslExecutableDTO action : flatOnLoadActions) {
                         assertThat(action.getId()).isNotBlank();
                         assertThat(action.getName()).isNotBlank();
                         assertThat(action.getTimeoutInMillisecond()).isNotZero();
@@ -1235,7 +1290,7 @@ public class LayoutServiceTest {
                     obj.put("dynamicBindingPathList", dynamicBindingsPathList);
                     newLayout.setDsl(obj);
 
-                    return layoutActionService.updateLayout(
+                    return updateLayoutService.updateLayout(
                             page1.getId(), page1.getApplicationId(), layout.getId(), newLayout);
                 });
 
@@ -1260,7 +1315,8 @@ public class LayoutServiceTest {
                                     layoutId.get(),
                                     oldParent,
                                     "dynamicGet_IncorrectKey",
-                                    "New element is null"));
+                                    "New element is null",
+                                    CreatorContextType.PAGE));
                     return true;
                 })
                 .verify();
@@ -1320,7 +1376,7 @@ public class LayoutServiceTest {
                     obj.put("dynamicBindingPathList", dynamicBindingsPathList);
                     newLayout.setDsl(obj);
 
-                    return layoutActionService.updateLayout(
+                    return updateLayoutService.updateLayout(
                             page1.getId(), page1.getApplicationId(), layout.getId(), newLayout);
                 });
 

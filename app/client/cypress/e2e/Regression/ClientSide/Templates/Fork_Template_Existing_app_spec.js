@@ -1,6 +1,10 @@
 import widgetLocators from "../../../../locators/Widgets.json";
 import template from "../../../../locators/TemplatesLocators.json";
-import * as _ from "../../../../support/Objects/ObjectsCore";
+import { agHelper, templates } from "../../../../support/Objects/ObjectsCore";
+import EditorNavigation, {
+  EntityType,
+} from "../../../../support/Pages/EditorNavigation";
+import PageList from "../../../../support/Pages/PageList";
 
 beforeEach(() => {
   // Closes template dialog if it is already open - useful for retry
@@ -9,34 +13,24 @@ beforeEach(() => {
       cy.xpath(template.closeButton).click({ force: true });
     }
   });
-  cy.CheckAndUnfoldEntityItem("Pages");
-  cy.get(`.t--entity-name:contains(Page1)`)
-    .trigger("mouseover")
-    .click({ force: true });
+  EditorNavigation.SelectEntityByName("Page1", EntityType.Page);
 });
 
 describe(
-  "excludeForAirgap",
   "Fork a template to the current app from new page popover",
+  { tags: ["@tag.Templates", "@tag.excludeForAirgap"] },
   () => {
     it("1. Fork template from page section", () => {
       //Fork template button to be visible always
-      _.entityExplorer.AddNewPage("Add page from template");
-      cy.wait(5000);
-      _.agHelper.AssertElementExist(_.templates.locators._forkApp);
-      cy.get(template.templateDialogBox).should("be.visible");
-      cy.wait(4000);
-      cy.xpath(
-        "//h1[text()='Meeting Scheduler']/parent::div//button[contains(@class, 't--fork-template')]",
-      )
-        .scrollIntoView()
-        .wait(500)
-        .click();
-      _.agHelper.WaitUntilEleDisappear(
-        "//*[text()='Loading template details']",
-      );
-      cy.wait(1000);
-      _.agHelper.CheckForErrorToast(
+      PageList.AddNewPage("Add page from template");
+      agHelper.Sleep(5000);
+      agHelper.AssertElementExist(template.templateDialogBox);
+      agHelper.AssertElementVisibility(templates.locators._templateCard);
+      agHelper.Sleep(4000);
+      agHelper.GetNClick(template.vehicleMaintenenceApp);
+      agHelper.WaitUntilEleDisappear("//*[text()='Loading template details']");
+      agHelper.Sleep();
+      agHelper.FailIfErrorToast(
         "Internal server error while processing request",
       );
       cy.get("body").then(($ele) => {
@@ -53,13 +47,16 @@ describe(
     });
 
     it("2. Add selected page of template from page section", () => {
-      _.entityExplorer.AddNewPage("Add page from template");
-      cy.get(template.templateDialogBox).should("be.visible");
-      cy.wait(4000);
-      cy.xpath("//h1[text()='Meeting Scheduler']").click();
-      _.agHelper.WaitUntilEleDisappear(
-        "//*[text()='Loading template details']",
+      PageList.AddNewPage("Add page from template");
+      agHelper.AssertElementVisibility(template.templateDialogBox);
+      agHelper.AssertElementVisibility(
+        templates.locators._templateCard,
+        true,
+        0,
+        30000,
       );
+      agHelper.GetNClick(template.vehicleMaintenenceApp);
+      //agHelper.WaitUntilEleDisappear("//*[text()='Loading template details']");
       cy.wait("@getTemplatePages").should(
         "have.nested.property",
         "response.body.responseMeta.status",
@@ -68,37 +65,50 @@ describe(
 
       //cy.xpath(template.selectAllPages).next().click();
       // cy.xpath("//span[text()='CALENDAR MOBILE']").parent().next().click();
-      cy.get(template.templateViewForkButton).click();
+      agHelper.GetNClick(template.templateViewForkButton);
       cy.wait("@fetchTemplate").should(
         "have.nested.property",
         "response.body.responseMeta.status",
         200,
       );
-      cy.get(widgetLocators.toastAction).should(
-        "contain",
+      agHelper.GetNAssertElementText(
+        widgetLocators.toastAction,
         "template added successfully",
+        "contain.text",
       );
     });
 
-    it("3. Fork template button should take user to 'select pages from template' page", () => {
-      _.agHelper.RefreshPage();
-      _.entityExplorer.AddNewPage("Add page from template");
-      cy.get(_.templates.locators._forkApp).first().click();
-      cy.get(template.templateViewForkButton).should("be.visible");
-      //Similar templates add icon should take user to 'select pages from template'
-      _.agHelper.RefreshPage();
-      _.entityExplorer.AddNewPage("Add page from template");
-      // We are currentlyon on templates list page
-      cy.get(_.templates.locators._forkApp).first().click();
-      // Here we are on template detail page, with similar templates at the bottom
-      cy.get(_.templates.locators._forkApp).first().click();
+    it("3. Templates card should take user to 'select pages from template' page", () => {
+      //agHelper.RefreshPage();
 
-      cy.get(template.templateViewForkButton).should("be.visible");
-      cy.get(_.templates.locators._closeTemplateDialogBoxBtn).click();
+      PageList.AddNewPage("Add page from template");
+      agHelper.AssertElementVisibility(
+        templates.locators._templateCard,
+        true,
+        0,
+        30000,
+      );
+      agHelper.GetNClick(templates.locators._templateCard);
+      agHelper.Sleep(2000);
+      agHelper.AssertElementVisibility(template.templateViewForkButton);
+      agHelper.Sleep(2000);
+      agHelper.GetNClick(templates.locators._closeTemplateDialogBoxBtn);
+      agHelper.Sleep();
+
+      //Similar templates add icon should take user to 'select pages from template'
+      //agHelper.RefreshPage();
+      PageList.AddNewPage("Add page from template");
+      // We are currentlyon on templates list page
+      agHelper.GetNClick(templates.locators._templateCard);
+      // Here we are on template detail page, with similar templates at the bottom
+      agHelper.GetNClick(templates.locators._templateCard);
+      agHelper.Sleep(2000);
+      agHelper.AssertElementVisibility(template.templateViewForkButton);
+      agHelper.Sleep(2000);
+      agHelper.GetNClick(templates.locators._closeTemplateDialogBoxBtn);
     });
 
     it("4. Add page from template to show only apps with 'allowPageImport:true'", () => {
-      _.agHelper.RefreshPage(); //is important for below intercept to go thru!
       cy.fixture("Templates/AllowPageImportTemplates.json").then((data) => {
         cy.intercept(
           {
@@ -110,10 +120,11 @@ describe(
             body: data,
           },
         ).as("fetchAllTemplates");
+        agHelper.RefreshPage(); //is important for intercept to go thru!
 
-        _.entityExplorer.AddNewPage("Add page from template");
+        PageList.AddNewPage("Add page from template");
 
-        cy.get(template.templateDialogBox).should("be.visible");
+        agHelper.AssertElementVisibility(template.templateDialogBox);
         cy.wait("@fetchAllTemplates");
         cy.get("@fetchAllTemplates").then(({ request, response }) => {
           // in the fixture data we are sending some tempaltes with `allowPageImport: false`
@@ -125,11 +136,11 @@ describe(
           const templatesInResponse = response.body.data.filter(
             (card) => !!card.allowPageImport,
           );
-          cy.get(template.templateCard).should(
-            "have.length",
+          agHelper.AssertElementLength(
+            template.templateCard,
             templatesInResponse.length,
           );
-          cy.get(_.templates.locators._closeTemplateDialogBoxBtn).click();
+          agHelper.GetNClick(templates.locators._closeTemplateDialogBoxBtn);
         });
       });
     });

@@ -61,6 +61,15 @@ import type { ListComputeControlProps } from "./ListComputeControl";
 import ListComputeControl from "./ListComputeControl";
 import type { OneClickBindingControlProps } from "./OneClickBindingControl";
 import OneClickBindingControl from "./OneClickBindingControl";
+import type { WrappedCodeEditorControlProps } from "./WrappedCodeEditorControl";
+import WrappedCodeEditorControl from "./WrappedCodeEditorControl";
+import DynamicPropertiesControl from "./HTMLDocumentBuilderControl";
+import CustomWidgetEditSourceButtonControl from "./CustomWidgetEditSourceButtonControl";
+import CustomWidgetAddEventButtonControl from "./CustomWidgetAddEventButtonControl";
+import type { ZoneStepperControlProps } from "./ZoneStepperControl";
+import ZoneStepperControl from "./ZoneStepperControl";
+import type { IconSelectControlV2Props } from "./IconSelectControlV2";
+import IconSelectControlV2 from "./IconSelectControlV2";
 
 export const PropertyControls = {
   InputTextControl,
@@ -104,6 +113,12 @@ export const PropertyControls = {
   TableInlineEditValidPropertyControl,
   ListComputeControl,
   OneClickBindingControl,
+  WrappedCodeEditorControl,
+  DynamicPropertiesControl,
+  CustomWidgetEditSourceButtonControl,
+  CustomWidgetAddEventButtonControl,
+  ZoneStepperControl,
+  IconSelectControlV2,
 };
 
 export type PropertyControlPropsType =
@@ -128,7 +143,10 @@ export type PropertyControlPropsType =
   | SelectDefaultValueControlProps
   | TableInlineEditValidationControlProps
   | ListComputeControlProps
-  | OneClickBindingControlProps;
+  | OneClickBindingControlProps
+  | WrappedCodeEditorControlProps
+  | ZoneStepperControlProps
+  | IconSelectControlV2Props;
 
 export const getPropertyControlTypes = (): { [key: string]: string } => {
   const _types: { [key: string]: string } = {};

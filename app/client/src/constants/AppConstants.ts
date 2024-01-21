@@ -78,7 +78,7 @@ export const NAVIGATION_SETTINGS = {
   },
 };
 
-export type NavigationSetting = {
+export interface NavigationSetting {
   showNavbar: boolean;
   showSignIn: boolean;
   orientation: (typeof NAVIGATION_SETTINGS.ORIENTATION)[keyof typeof NAVIGATION_SETTINGS.ORIENTATION];
@@ -88,7 +88,17 @@ export type NavigationSetting = {
   colorStyle: (typeof NAVIGATION_SETTINGS.COLOR_STYLE)[keyof typeof NAVIGATION_SETTINGS.COLOR_STYLE];
   logoAssetId: string;
   logoConfiguration: (typeof NAVIGATION_SETTINGS.LOGO_CONFIGURATION)[keyof typeof NAVIGATION_SETTINGS.LOGO_CONFIGURATION];
-};
+}
+
+export interface ThemeSetting {
+  accentColor: string;
+  colorMode: "LIGHT" | "DARK";
+  borderRadius: string;
+  density: number;
+  sizing: number;
+  fontFamily: string;
+  iconStyle: "FILLED" | "OUTLINED";
+}
 
 export type StringsFromNavigationSetting = Omit<
   NavigationSetting,
@@ -120,10 +130,22 @@ export const defaultNavigationSetting = {
     NAVIGATION_SETTINGS.LOGO_CONFIGURATION.LOGO_AND_APPLICATION_TITLE,
 };
 
+export const defaultThemeSetting: ThemeSetting = {
+  fontFamily: "System Default",
+  accentColor: "#553DE9",
+  colorMode: "LIGHT",
+  borderRadius: "6px",
+  density: 1,
+  sizing: 1,
+  iconStyle: "OUTLINED",
+};
+
 export const SIDEBAR_WIDTH = {
   REGULAR: 270,
   MINIMAL: 66,
 };
+
+export const APP_SIDEBAR_WIDTH = 50;
 
 export const APPLICATION_TITLE_MAX_WIDTH = 192;
 export const APPLICATION_TITLE_MAX_WIDTH_MOBILE = 150;

@@ -9,6 +9,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.Set;
 
@@ -27,6 +28,12 @@ public class UserSessionDTO {
     private String hashedEmail;
 
     private String name;
+
+    private Long createdAt;
+
+    private Boolean emailVerified;
+
+    private Boolean emailVerificationRequired;
 
     private LoginSource source;
 
@@ -70,12 +77,18 @@ public class UserSessionDTO {
         session.email = user.getEmail();
         session.hashedEmail = user.getHashedEmail();
         session.name = user.getName();
+        // user.getCreatedAt() is null for anonymous user
+        if (user.getCreatedAt() != null) {
+            session.createdAt = user.getCreatedAt().getEpochSecond();
+        }
         session.source = user.getSource();
         session.state = user.getState();
         session.isEnabled = user.isEnabled();
         session.currentWorkspaceId = user.getCurrentWorkspaceId();
         session.workspaceIds = user.getWorkspaceIds();
         session.tenantId = user.getTenantId();
+        session.emailVerified = Boolean.TRUE.equals(user.getEmailVerified());
+        session.emailVerificationRequired = Boolean.TRUE.equals(user.getEmailVerificationRequired());
 
         session.credentials = authentication.getCredentials();
         session.authorities = authentication.getAuthorities();
@@ -106,12 +119,18 @@ public class UserSessionDTO {
         user.setEmail(email);
         user.setHashedEmail(hashedEmail);
         user.setName(name);
+        // createdAt is null for anonymous user
+        if (createdAt != null) {
+            user.setCreatedAt(Instant.ofEpochSecond(createdAt));
+        }
         user.setSource(source);
         user.setState(state);
         user.setIsEnabled(isEnabled);
         user.setCurrentWorkspaceId(currentWorkspaceId);
         user.setWorkspaceIds(workspaceIds);
         user.setTenantId(tenantId);
+        user.setEmailVerified(Boolean.TRUE.equals(emailVerified));
+        user.setEmailVerificationRequired(Boolean.TRUE.equals(emailVerificationRequired));
 
         if (PASSWORD_PROVIDER.equals(authorizedClientRegistrationId)) {
             return new UsernamePasswordAuthenticationToken(user, credentials, authorities);

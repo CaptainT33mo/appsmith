@@ -3,6 +3,7 @@ import type {
   PropertyNode,
   MemberExpressionData,
   IdentifierInfo,
+  AssignmentExpressionData,
 } from "./src";
 import {
   isIdentifierNode,
@@ -15,10 +16,11 @@ import {
   getAST,
   extractIdentifierInfoFromCode,
   entityRefactorFromCode,
-  extractInvalidTopLevelMemberExpressionsFromCode,
+  extractExpressionsFromCode,
   getFunctionalParamsFromNode,
   isTypeOfFunction,
   isFunctionPresent,
+  getMemberExpressionObjectFromProperty,
 } from "./src";
 
 // constants
@@ -78,6 +80,7 @@ export type {
   TParsedJSProperty,
   JSPropertyPosition,
   PeekOverlayExpressionIdentifierOptions,
+  AssignmentExpressionData,
   JSVarProperty,
   JSFunctionProperty,
 };
@@ -93,7 +96,7 @@ export {
   getAST,
   extractIdentifierInfoFromCode,
   entityRefactorFromCode,
-  extractInvalidTopLevelMemberExpressionsFromCode,
+  extractExpressionsFromCode,
   getFunctionalParamsFromNode,
   isTypeOfFunction,
   parseJSObject,
@@ -131,4 +134,5 @@ export {
   isJSFunctionProperty,
   isFunctionPresent,
   PeekOverlayExpressionIdentifier,
+  getMemberExpressionObjectFromProperty,
 };

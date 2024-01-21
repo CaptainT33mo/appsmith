@@ -1,12 +1,6 @@
 import {
-  fetchAppThemesAction,
-  fetchSelectedAppThemeAction,
-} from "actions/appThemingActions";
-import { fetchJSCollectionsForView } from "actions/jsActionActions";
-import {
   fetchAllPageEntityCompletion,
-  fetchPublishedPage,
-  fetchPublishedPageSuccess,
+  setupPublishedPage,
 } from "actions/pageActions";
 import {
   executePageLoadActions,
@@ -17,8 +11,12 @@ import {
   ReduxActionTypes,
 } from "@appsmith/constants/ReduxActionConstants";
 import type { APP_MODE } from "entities/App";
-import { call, put } from "redux-saga/effects";
-import { failFastApiCalls, waitForWidgetConfigBuild } from "sagas/InitSagas";
+import { call, put, spawn } from "redux-saga/effects";
+import {
+  failFastApiCalls,
+  reportSWStatus,
+  waitForWidgetConfigBuild,
+} from "sagas/InitSagas";
 import PerformanceTracker, {
   PerformanceTransactionName,
 } from "utils/PerformanceTracker";
@@ -29,6 +27,12 @@ import {
   waitForSegmentInit,
   waitForFetchUserSuccess,
 } from "@appsmith/sagas/userSagas";
+import { waitForFetchEnvironments } from "@appsmith/sagas/EnvironmentSagas";
+import { fetchJSCollectionsForView } from "actions/jsActionActions";
+import {
+  fetchAppThemesAction,
+  fetchSelectedAppThemeAction,
+} from "actions/appThemingActions";
 
 export default class AppViewerEngine extends AppEngine {
   constructor(mode: APP_MODE) {
@@ -55,6 +59,7 @@ export default class AppViewerEngine extends AppEngine {
         type: ReduxActionTypes.FETCH_ALL_PUBLISHED_PAGES,
       });
     }
+    yield spawn(reportSWStatus);
   }
 
   *setupEngine(payload: AppEnginePayload) {
@@ -79,7 +84,7 @@ export default class AppViewerEngine extends AppEngine {
       fetchJSCollectionsForView({ applicationId }),
       fetchSelectedAppThemeAction(applicationId),
       fetchAppThemesAction(applicationId),
-      fetchPublishedPage(toLoadPageId, true, true),
+      setupPublishedPage(toLoadPageId, true, true),
     ];
 
     const successActionEffects = [
@@ -87,14 +92,14 @@ export default class AppViewerEngine extends AppEngine {
       ReduxActionTypes.FETCH_JS_ACTIONS_VIEW_MODE_SUCCESS,
       ReduxActionTypes.FETCH_APP_THEMES_SUCCESS,
       ReduxActionTypes.FETCH_SELECTED_APP_THEME_SUCCESS,
-      fetchPublishedPageSuccess().type,
+      ReduxActionTypes.SETUP_PUBLISHED_PAGE_SUCCESS,
     ];
     const failureActionEffects = [
       ReduxActionErrorTypes.FETCH_ACTIONS_VIEW_MODE_ERROR,
       ReduxActionErrorTypes.FETCH_JS_ACTIONS_VIEW_MODE_ERROR,
       ReduxActionErrorTypes.FETCH_APP_THEMES_ERROR,
       ReduxActionErrorTypes.FETCH_SELECTED_APP_THEME_ERROR,
-      ReduxActionErrorTypes.FETCH_PUBLISHED_PAGE_ERROR,
+      ReduxActionErrorTypes.SETUP_PUBLISHED_PAGE_ERROR,
     ];
 
     initActionsCalls.push(fetchJSLibraries(applicationId));
@@ -114,6 +119,7 @@ export default class AppViewerEngine extends AppEngine {
 
     yield call(waitForFetchUserSuccess);
     yield call(waitForSegmentInit, true);
+    yield call(waitForFetchEnvironments);
     yield put(fetchAllPageEntityCompletion([executePageLoadActions()]));
   }
 }

@@ -118,7 +118,7 @@ export function* validateResponse(
   yield put({
     type: ReduxActionErrorTypes.API_ERROR,
     payload: {
-      error: response.responseMeta.error,
+      error: new Error(response.responseMeta.error.message),
       logToSentry,
       show,
     },
@@ -132,12 +132,12 @@ export function getResponseErrorMessage(response: ApiResponse) {
     : undefined;
 }
 
-type ClientDefinedErrorMetadata = {
+interface ClientDefinedErrorMetadata {
   clientDefinedError: boolean;
   statusCode: string;
   message: string;
   pluginErrorDetails: PluginErrorDetails;
-};
+}
 
 export function extractClientDefinedErrorMetadata(
   err: any,
@@ -154,11 +154,11 @@ export function extractClientDefinedErrorMetadata(
   }
 }
 
-export type ErrorPayloadType = {
+export interface ErrorPayloadType {
   code?: number | string;
   message?: string;
   crash?: boolean;
-};
+}
 const ActionErrorDisplayMap: {
   [key: string]: (error: ErrorPayloadType) => string;
 } = {

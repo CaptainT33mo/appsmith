@@ -8,6 +8,9 @@ import {
   table,
 } from "../../../../../support/Objects/ObjectsCore";
 import { OneClickBinding } from "../spec_utility";
+import EditorNavigation, {
+  EntityType,
+} from "../../../../../support/Pages/EditorNavigation";
 
 const oneClickBinding = new OneClickBinding();
 
@@ -19,16 +22,11 @@ describe.skip("Table widget one click binding feature", () => {
     dataSources.CreateDataSource("MySql");
 
     cy.get("@dsName").then((dsName) => {
-      entityExplorer.NavigateToSwitcher("Widgets");
+      EditorNavigation.SelectEntityByName("Table1", EntityType.Widget);
 
-      entityExplorer.SelectEntityByName("Table1", "Widgets");
-
-      oneClickBinding.ChooseAndAssertForm(
-        `${dsName}`,
-        dsName,
-        "configs",
-        "configName",
-      );
+      oneClickBinding.ChooseAndAssertForm(`${dsName}`, dsName, "configs", {
+        searchableColumn: "configName",
+      });
     });
 
     agHelper.GetNClick(oneClickBindingLocator.connectData);
@@ -84,10 +82,7 @@ describe.skip("Table widget one click binding feature", () => {
     assertHelper.AssertNetworkStatus("@postExecute");
 
     agHelper.Sleep(500);
-
-    agHelper.ClearTextField(table._searchInput);
-
-    agHelper.TypeText(table._searchInput, "Bindings");
+    agHelper.ClearNType(table._searchInput, "Bindings");
 
     assertHelper.AssertNetworkStatus("@postExecute");
 
@@ -95,9 +90,7 @@ describe.skip("Table widget one click binding feature", () => {
 
     agHelper.AssertElementExist(table._bodyCell("Bindings"));
 
-    agHelper.ClearTextField(table._searchInput);
-
-    agHelper.TypeText(table._searchInput, "One Click Config");
+    agHelper.ClearNType(table._searchInput, "One Click Config");
 
     assertHelper.AssertNetworkStatus("@postExecute");
 

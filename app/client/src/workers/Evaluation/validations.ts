@@ -19,7 +19,11 @@ import type { ValidationConfig } from "constants/PropertyControlConstants";
 
 import getIsSafeURL from "utils/validation/getIsSafeURL";
 import * as log from "loglevel";
-import { countOccurrences, findDuplicateIndex } from "./helpers";
+import {
+  countOccurrences,
+  findDuplicateIndex,
+  stringifyFnsInObject,
+} from "./helpers";
 
 export const UNDEFINED_VALIDATION = "UNDEFINED_VALIDATION";
 export const VALIDATION_ERROR_COUNT_THRESHOLD = 10;
@@ -123,6 +127,7 @@ function validateArray(
   // Keys whose values are supposed to be unique across all values in all objects in the array
   let uniqueKeys: Array<string> = [];
   const allowedKeyConfigs = config.params?.children?.params?.allowedKeys;
+
   if (
     config.params?.children?.type === ValidationTypes.OBJECT &&
     Array.isArray(allowedKeyConfigs) &&
@@ -359,6 +364,7 @@ export function getExpectedType(config?: ValidationConfig): string | undefined {
 
       return validationType;
     case ValidationTypes.OBJECT:
+    case ValidationTypes.OBJECT_WITH_FUNCTION:
       let objectType = "Object";
       if (config.params?.allowedKeys) {
         objectType = "{";
@@ -1246,5 +1252,79 @@ export const VALIDATORS: Record<ValidationTypes, Validator> = {
       isValid: true,
       parsed: resultValue,
     };
+  },
+  [ValidationTypes.OBJECT_WITH_FUNCTION]: (
+    config: ValidationConfig,
+    value: any,
+    props: Record<string, unknown>,
+    propertyPath: string,
+  ): ValidationResponse => {
+    const invalidResponse = {
+      isValid: true,
+      parsed: {},
+      messages: [
+        {
+          name: "TypeError",
+          message: `${WIDGET_TYPE_VALIDATION_ERROR} ${getExpectedType(config)}`,
+        },
+      ],
+    };
+
+    const { isValid, messages, parsed } = VALIDATORS[ValidationTypes.OBJECT](
+      config,
+      value,
+      props,
+      propertyPath,
+    );
+
+    if (!isValid) {
+      return { isValid, messages, parsed }; // return the expected type
+    } else {
+      return { isValid, messages, parsed: stringifyFnsInObject(parsed) };
+    }
+  },
+
+  [ValidationTypes.UNION]: (
+    config: ValidationConfig,
+    value: unknown,
+    props: Record<string, unknown>,
+    propertyPath: string,
+  ): ValidationResponse => {
+    if (config.params?.types && config.params?.types.length > 0) {
+      for (const childConfig of config.params.types) {
+        const result = VALIDATORS[childConfig.type](
+          childConfig,
+          value,
+          props,
+          propertyPath,
+        );
+
+        if (result.isValid) {
+          return result;
+        }
+      }
+
+      return {
+        isValid: false,
+        parsed: config.params.defaultValue,
+        messages: [
+          {
+            name: "ValidationError",
+            message: config.params.defaultErrorMessage || "",
+          },
+        ],
+      };
+    } else {
+      return {
+        isValid: false,
+        parsed: undefined,
+        messages: [
+          {
+            name: "ValidationError",
+            message: "Invalid validation configuration",
+          },
+        ],
+      };
+    }
   },
 };

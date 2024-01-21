@@ -90,7 +90,7 @@ export class Table {
   _liCurrentSelectedPage =
     "//div[@type='LIST_WIDGET']//ul[contains(@class, 'rc-pagination')]/li[contains(@class, 'rc-pagination-item-active')]/a";
   private _tr = ".tbody .tr";
-  private _searchText = "input[type='search']";
+  private _searchTableInput = "input[type='search'][placeholder='Search...']";
   _searchBoxCross =
     "//div[contains(@class, 't--search-input')]/following-sibling::div";
   _addIcon = "button .bp3-icon-add";
@@ -141,7 +141,7 @@ export class Table {
   _filtersCount = this._filterBtn + " span.action-title";
   _headerCell = (column: string) =>
     `.t--widget-tablewidgetv2 .thead .th:contains(${column})`;
-  private _addNewRow = ".t--add-new-row";
+  public _addNewRow = ".t--add-new-row";
   _saveNewRow = ".t--save-new-row";
   _discardRow = ".t--discard-new-row";
   _searchInput = ".t--search-input input";
@@ -160,6 +160,7 @@ export class Table {
   _columnCheckbox = (columnName: string) =>
     "[data-rbd-draggable-id='" + columnName + "']" + " .t--card-checkbox input";
   _dateInputPopover = ".bp3-dateinput-popover";
+  _tableV2Widget = ".t--draggable-tablewidgetv2";
   _tableV2Row = ".t--draggable-tablewidgetv2 .tbody";
   _weekdayRowDayPicker =
     ".bp3-datepicker .DayPicker .DayPicker-Months .DayPicker-WeekdaysRow";
@@ -186,6 +187,19 @@ export class Table {
     ".bp3-dateinput-popover .bp3-daterangepicker-shortcuts";
   _dayPickerFirstChild = ".DayPicker-Day:first-child";
   _divFirstChild = "div:first-child abbr";
+  _listPreviousPage = ".rc-pagination-prev";
+  _listNavigation = (move: string) =>
+    "//button[@aria-label='" + move + " page']";
+  _listNextPage = ".rc-pagination-next";
+  _listActivePage = (version: "v1" | "v2") =>
+    `.t--widget-listwidget${
+      version == "v1" ? "" : version
+    } .rc-pagination-item-active`;
+  _paginationItem = (value: number) => `.rc-pagination-item-${value}`;
+  _cellWrapOff = "//div[@class='tableWrap virtual']";
+  _cellWrapOn = "//div[@class='tableWrap']";
+  _multirowselect = ".t--table-multiselect";
+  _selectedrow = ".selected-row";
 
   public GetNumberOfRows() {
     return this.agHelper.GetElement(this._tr).its("length");
@@ -228,25 +242,19 @@ export class Table {
     tableVersion: "v1" | "v2" = "v1",
   ) {
     this.agHelper
-      .GetElement(
-        this._tableRowColumnData(rowIndex, colIndex, tableVersion),
-        30000,
-      )
+      .GetElement(this._tableRowColumnData(rowIndex, colIndex, tableVersion))
       .waitUntil(($ele) =>
         cy.wrap($ele).children("span").should("not.be.empty"),
       );
   }
 
   public WaitForTableEmpty(tableVersion: "v1" | "v2" = "v1") {
-    cy.waitUntil(() => cy.get(this._tableEmptyColumnData(tableVersion)), {
-      errorMsg: "Table is populated when not expected",
-      timeout: 10000,
-      interval: 2000,
-    }).then(($children) => {
-      cy.wrap($children).children().should("have.length", 0); //or below
-      //expect($children).to.have.lengthOf(0)
-      this.agHelper.Sleep(500);
-    });
+    this.agHelper
+      .GetElement(this._tableEmptyColumnData(tableVersion), "noVerify")
+      .children()
+      .should("have.length", 0); //or below
+    //expect($children).to.have.lengthOf(0)
+    this.agHelper.Sleep(500);
   }
 
   public AssertTableHeaderOrder(expectedOrder: string) {
@@ -280,7 +288,7 @@ export class Table {
     //timeout can be sent higher values incase of larger tables
     this.agHelper.Sleep(timeout); //Settling time for table!
     return this.agHelper
-      .GetElement(this._tableRowColumnData(rowNum, colNum, tableVersion), 30000)
+      .GetElement(this._tableRowColumnData(rowNum, colNum, tableVersion))
       .invoke("text");
   }
 
@@ -436,11 +444,11 @@ export class Table {
   }
 
   public AssertSearchText(searchTxt: string, index = 0) {
-    cy.get(this._searchText).eq(index).should("have.value", searchTxt);
+    cy.get(this._searchTableInput).eq(index).should("have.value", searchTxt);
   }
 
   public SearchTable(searchTxt: string, index = 0) {
-    cy.get(this._searchText).eq(index).type(searchTxt);
+    this.agHelper.TypeText(this._searchTableInput, searchTxt, index);
   }
 
   public ResetSearch() {
@@ -521,11 +529,11 @@ export class Table {
     cy.get(this._downloadOption).contains(filetype).click({ force: true });
   }
 
-  public ValidateDownloadNVerify(fileName: string, textToBePresent: string) {
+  public ValidateDownloadNVerify(fileName: string, textToBePresent = "") {
     let downloadsFolder = Cypress.config("downloadsFolder");
     cy.log("downloadsFolder is:" + downloadsFolder);
     cy.readFile(path.join(downloadsFolder, fileName)).should("exist");
-    this.VerifyDownloadedFile(fileName, textToBePresent);
+    textToBePresent && this.VerifyDownloadedFile(fileName, textToBePresent);
   }
 
   public VerifyDownloadedFile(fileName: string, textToBePresent: string) {
@@ -543,7 +551,7 @@ export class Table {
     tableVersion: "v1" | "v2" = "v1",
   ) {
     this.EditColumn(columnName, tableVersion);
-    this.agHelper.SelectDropdownList("Column type", newDataType);
+    this.propPane.SelectPropertiesDropDown("Column type", newDataType);
     this.assertHelper.AssertNetworkStatus("@updateLayout");
     if (tableVersion == "v2") this.propPane.NavigateBackToPropertyPane();
   }
@@ -616,7 +624,7 @@ export class Table {
       0,
       true,
     );
-    this.agHelper.AssertElementVisible(
+    this.agHelper.AssertElementVisibility(
       this._tableRow(rowIndex, colIndex, "v2") +
         " " +
         this._editCellEditorInput,
@@ -654,7 +662,9 @@ export class Table {
       force,
     );
     toSaveNewValue &&
-      this.agHelper.TypeText(this._editCellEditorInput, "{enter}", 0, true);
+      this.agHelper.TypeText(this._editCellEditorInput, "{enter}", {
+        parseSpecialCharSeq: true,
+      });
   }
 
   public DeleteColumn(colId: string) {
@@ -668,41 +678,92 @@ export class Table {
   }
 
   //List methods - keeping it for now!
-  public NavigateToNextPage_List() {
+  public NavigateToNextPage_List(tableVersion: "v1" | "v2" = "v1", index = 0) {
     let curPageNo: number;
-    cy.xpath(this._liCurrentSelectedPage)
-      .invoke("text")
-      .then(($currentPageNo) => (curPageNo = Number($currentPageNo)));
-    cy.get(this._liNextPage).click();
-    //cy.scrollTo('top', { easing: 'linear' })
-    cy.xpath(this._liCurrentSelectedPage)
-      .invoke("text")
-      .then(($newPageNo) => expect(Number($newPageNo)).to.eq(curPageNo + 1));
+    if (tableVersion == "v1") {
+      cy.xpath(this._liCurrentSelectedPage)
+        .invoke("text")
+        .then(($currentPageNo) => (curPageNo = Number($currentPageNo)));
+      cy.get(this._listNextPage).click();
+      //cy.scrollTo('top', { easing: 'linear' })
+      cy.xpath(this._liCurrentSelectedPage)
+        .invoke("text")
+        .then(($newPageNo) => expect(Number($newPageNo)).to.eq(curPageNo + 1));
+    } else if (tableVersion == "v2") {
+      this.agHelper
+        .GetText(this._listActivePage(tableVersion), "text", index)
+        .then(($currentPageNo) => (curPageNo = Number($currentPageNo)));
+      this.agHelper.GetNClick(this._listNextPage, index);
+      this.agHelper.Sleep(1000);
+      this.agHelper
+        .GetText(this._listActivePage(tableVersion), "text", index)
+        .then(($newPageNo) => expect(Number($newPageNo)).to.eq(curPageNo + 1));
+    }
   }
 
-  public NavigateToPreviousPage_List() {
+  public NavigateToPreviousPage_List(
+    tableVersion: "v1" | "v2" = "v1",
+    index = 0,
+  ) {
     let curPageNo: number;
-    cy.xpath(this._liCurrentSelectedPage)
-      .invoke("text")
+    this.agHelper
+      .GetText(this._listActivePage(tableVersion), "text", index)
       .then(($currentPageNo) => (curPageNo = Number($currentPageNo)));
-    cy.get(this._liPreviousPage).click();
-    //cy.scrollTo('top', { easing: 'linear' })
-    cy.xpath(this._liCurrentSelectedPage)
-      .invoke("text")
+    this.agHelper.GetNClick(this._liPreviousPage, index);
+    this.agHelper.Sleep(1000);
+    this.agHelper
+      .GetText(this._listActivePage(tableVersion), "text", index)
       .then(($newPageNo) => expect(Number($newPageNo)).to.eq(curPageNo - 1));
+    //}
   }
 
-  public AssertPageNumber_List(pageNo: number, checkNoNextPage = false) {
-    cy.xpath(this._liCurrentSelectedPage)
-      .invoke("text")
-      .then(($currentPageNo) => expect(Number($currentPageNo)).to.eq(pageNo));
+  public AssertPageNumber_List(
+    pageNo: number,
+    checkNoNextPage = false,
+    tableVersion: "v1" | "v2" = "v1",
+  ) {
+    if (tableVersion == "v1") {
+      cy.xpath(this._liCurrentSelectedPage)
+        .invoke("text")
+        .then(($currentPageNo) => expect(Number($currentPageNo)).to.eq(pageNo));
 
-    if (pageNo == 1)
-      cy.get(this._liPreviousPage).should("have.attr", "aria-disabled", "true");
+      if (pageNo == 1)
+        this.agHelper.AssertAttribute(
+          this._liPreviousPage,
+          "aria-disabled",
+          "true",
+        );
+      if (checkNoNextPage)
+        this.agHelper.AssertAttribute(
+          this._listNextPage,
+          "aria-disabled",
+          "true",
+        );
+      else
+        this.agHelper.AssertAttribute(
+          this._listNextPage,
+          "aria-disabled",
+          "false",
+        );
+    } else if (tableVersion == "v2") {
+      this.agHelper
+        .GetText(this._listActivePage(tableVersion), "text")
+        .then(($currentPageNo) => expect(Number($currentPageNo)).to.eq(pageNo));
 
-    if (checkNoNextPage)
-      cy.get(this._liNextPage).should("have.attr", "aria-disabled", "true");
-    else cy.get(this._liNextPage).should("have.attr", "aria-disabled", "false");
+      if (pageNo == 1)
+        this.agHelper
+          .GetElement(this._listPreviousPage)
+          .should("have.class", "rc-pagination-disabled");
+
+      if (checkNoNextPage)
+        this.agHelper
+          .GetElement(this._listNextPage)
+          .should("have.class", "rc-pagination-disabled");
+      else
+        this.agHelper
+          .GetElement(this._listNextPage)
+          .should("not.have.class", "rc-pagination-disabled");
+    }
   }
 
   public AddSampleTableData() {
@@ -731,5 +792,28 @@ export class Table {
           expect(classes).includes("draggable-header");
         });
     });
+  }
+
+  //This method is used to navigate forward using ">" button and backward "<"
+  public NavigateToPageUsingButton_List(
+    movement: string,
+    pageNumber: number,
+    version: "v1" | "v2" = "v2",
+  ) {
+    this.agHelper.GetNClick(this._listNavigation(movement), 0, true);
+    this.agHelper.Sleep(2000);
+    this.agHelper
+      .GetText(this._listActivePage(version), "text")
+      .then(($newPageNo) => expect(Number($newPageNo)).to.eq(pageNumber));
+  }
+
+  public NavigateToSpecificPage_List(
+    pageNumber: number,
+    version: "v1" | "v2" = "v2",
+  ) {
+    this.agHelper.GetNClick(`${this._paginationItem(pageNumber)}`);
+    this.agHelper
+      .GetText(this._listActivePage(version), "text")
+      .then(($newPageNo) => expect(Number($newPageNo)).to.eq(pageNumber));
   }
 }

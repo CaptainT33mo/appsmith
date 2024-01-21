@@ -21,9 +21,9 @@ import {
 import { Button, Text } from "design-system";
 import RequestDropdownField from "./RequestDropdownField";
 
-type CustomStack = {
+interface CustomStack {
   removeTopPadding?: boolean;
-};
+}
 
 const KeyValueStackContainer = styled.div<CustomStack>`
   padding: 0 0 var(--ads-v2-spaces-7) 0;
@@ -144,7 +144,7 @@ function KeyValueRow(props: Props & WrappedFieldArrayProps) {
 
             return (
               <FormRowWithLabel key={index}>
-                <Flex data-replay-id={btoa(`${field}.key`)} size={1}>
+                <Flex data-location-id={btoa(`${field}.key`)} size={1}>
                   {props.hasType ? (
                     <DynamicTextFieldWithDropdownWrapper>
                       <DynamicTextField
@@ -161,7 +161,7 @@ function KeyValueRow(props: Props & WrappedFieldArrayProps) {
                       />
 
                       <DynamicDropdownFieldWrapper
-                        data-replay-id={btoa(`${field}.type`)}
+                        data-location-id={btoa(`${field}.type`)}
                       >
                         {/* eslint-disable-next-line */}
                         {/* @ts-ignore*/}
@@ -189,7 +189,7 @@ function KeyValueRow(props: Props & WrappedFieldArrayProps) {
                 </Flex>
 
                 {!props.actionConfig && (
-                  <Flex data-replay-id={btoa(`${field}.value`)} size={3}>
+                  <Flex data-location-id={btoa(`${field}.value`)} size={3}>
                     <DynamicTextField
                       border={CodeEditorBorder.ALL_SIDE}
                       className={`t--${field}.value.${index}`}
@@ -206,7 +206,7 @@ function KeyValueRow(props: Props & WrappedFieldArrayProps) {
                 )}
 
                 {props.actionConfig && props.actionConfig[index] && (
-                  <Flex data-replay-id={btoa(`${field}.value`)} size={3}>
+                  <Flex data-location-id={btoa(`${field}.value`)} size={3}>
                     <DynamicTextField
                       className={`t--${field}.value.${index}`}
                       dataTreePath={`${props.dataTreePath}[${index}].value`}
@@ -269,7 +269,7 @@ function KeyValueRow(props: Props & WrappedFieldArrayProps) {
   );
 }
 
-type Props = {
+interface Props {
   name: string;
   label: string;
   rightIcon?: React.ReactNode;
@@ -285,7 +285,7 @@ type Props = {
   theme?: EditorTheme;
   hasType?: boolean;
   removeTopPadding?: boolean;
-};
+}
 
 function KeyValueFieldArray(props: Props) {
   return (

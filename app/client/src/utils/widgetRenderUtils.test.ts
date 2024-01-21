@@ -1,12 +1,12 @@
 import type {
-  DataTree,
   WidgetEntity,
   WidgetEntityConfig,
-} from "entities/DataTree/dataTreeFactory";
+} from "@appsmith/entities/DataTree/types";
+import type { DataTree } from "entities/DataTree/dataTreeTypes";
 import type { CanvasWidgetsReduxState } from "reducers/entityReducers/canvasWidgetsReducer";
 import type { MetaWidgetsReduxState } from "reducers/entityReducers/metaWidgetsReducer";
 import { buildChildWidgetTree, createCanvasWidget } from "./widgetRenderUtils";
-import type { FlattenedWidgetProps } from "widgets/constants";
+import type { FlattenedWidgetProps } from "WidgetProvider/constants";
 
 describe("createCanvasWidget functionality", () => {
   it("returns an empty errors if no evaluations are present", function () {
@@ -41,7 +41,7 @@ describe("createCanvasWidget functionality", () => {
     const dataTree = {
       __evaluation__: {
         errors: {
-          text: [
+          propertyPath: [
             {
               errorMessage: {
                 name: "Validation Error",
@@ -64,6 +64,7 @@ describe("createCanvasWidget functionality", () => {
     expect(response.errors[0].message).toStrictEqual("Error Message");
     expect(response.errors[0].stack).toStrictEqual("Error Message Stack");
     expect(response.errors[0].type).toStrictEqual("property");
+    expect(response.errors[0].path).toStrictEqual("propertyPath");
   });
 });
 

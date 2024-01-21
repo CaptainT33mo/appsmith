@@ -5,12 +5,14 @@ import { ReduxActionTypes } from "@appsmith/constants/ReduxActionConstants";
 import { omit, isUndefined, isEmpty } from "lodash";
 import equal from "fast-deep-equal";
 import { ActionExecutionResizerHeight } from "pages/Editor/APIEditor/constants";
+import { klona } from "klona";
 
 export const DefaultDebuggerContext = {
   scrollPosition: 0,
   selectedDebuggerTab: "",
   responseTabHeight: ActionExecutionResizerHeight,
   errorCount: 0,
+  selectedDebuggerFilter: "",
 };
 
 const initialState: DebuggerReduxState = {
@@ -116,6 +118,12 @@ const debuggerReducer = createImmerReducer(initialState, {
   ) => {
     state.context.selectedDebuggerTab = action.selectedTab;
   },
+  [ReduxActionTypes.SET_DEBUGGER_SELECTED_FILTER]: (
+    state: DebuggerReduxState,
+    action: { selectedFilter: string },
+  ) => {
+    state.context.selectedDebuggerFilter = action.selectedFilter;
+  },
   [ReduxActionTypes.SET_RESPONSE_PANE_HEIGHT]: (
     state: DebuggerReduxState,
     action: { height: number },
@@ -152,6 +160,10 @@ const debuggerReducer = createImmerReducer(initialState, {
   ) => {
     state.context = action.context;
   },
+  // Resetting debugger state after env switch
+  [ReduxActionTypes.SWITCH_ENVIRONMENT_SUCCESS]: () => {
+    return klona(initialState);
+  },
 });
 
 export interface DebuggerReduxState {
@@ -163,11 +175,12 @@ export interface DebuggerReduxState {
   context: DebuggerContext;
 }
 
-export type DebuggerContext = {
+export interface DebuggerContext {
   scrollPosition: number;
   errorCount: number;
   selectedDebuggerTab: string;
   responseTabHeight: number;
-};
+  selectedDebuggerFilter: string;
+}
 
 export default debuggerReducer;

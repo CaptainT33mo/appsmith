@@ -10,11 +10,13 @@ import lombok.Setter;
 import org.springframework.data.annotation.Transient;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
 
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import static com.appsmith.external.constants.PluginConstants.DEFAULT_APPSMITH_AI_DATASOURCE;
 import static com.appsmith.external.constants.PluginConstants.DEFAULT_REST_DATASOURCE;
 
 @Getter
@@ -101,37 +103,6 @@ public class DatasourceStorage extends BaseDomain {
         }
     }
 
-    // TODO: Get rid of this after migration
-    public DatasourceStorage(Datasource datasource, String environmentId) {
-        this.datasourceId = datasource.getId();
-        this.environmentId = environmentId;
-        this.datasourceConfiguration = datasource.getDatasourceConfiguration();
-        this.isConfigured = datasource.getIsConfigured();
-        this.gitSyncId = datasource.getGitSyncId();
-        this.invalids = new HashSet<>();
-        if (datasource.getMessages() != null) {
-            this.messages.addAll(datasource.getMessages());
-        }
-
-        this.prepareTransientFields(datasource);
-    }
-
-    public DatasourceStorage(DatasourceStorageDTO datasourceStorageDTO) {
-        this.setId(datasourceStorageDTO.getId());
-        this.datasourceId = datasourceStorageDTO.getDatasourceId();
-        this.environmentId = datasourceStorageDTO.getEnvironmentId();
-        this.datasourceConfiguration = datasourceStorageDTO.getDatasourceConfiguration();
-        this.isConfigured = datasourceStorageDTO.getIsConfigured();
-        this.pluginId = datasourceStorageDTO.getPluginId();
-        this.workspaceId = datasourceStorageDTO.getWorkspaceId();
-        if (datasourceStorageDTO.invalids != null) {
-            this.invalids.addAll(datasourceStorageDTO.getInvalids());
-        }
-        if (datasourceStorageDTO.getMessages() != null) {
-            this.messages.addAll(datasourceStorageDTO.getMessages());
-        }
-    }
-
     public void prepareTransientFields(Datasource datasource) {
         this.datasourceId = datasource.getId();
         this.name = datasource.getName();
@@ -176,6 +147,7 @@ public class DatasourceStorage extends BaseDomain {
          * user clicks on `test datasource` button.
          * DEFAULT_REST_DATASOURCE is the embedded datasource name for both REST API plugin and GraphQL plugin.
          */
-        return DEFAULT_REST_DATASOURCE.equals(this.name) && this.getDatasourceId() == null;
+        return (DEFAULT_REST_DATASOURCE.equals(this.name) || DEFAULT_APPSMITH_AI_DATASOURCE.equals(this.name))
+                && !StringUtils.hasText(this.datasourceId);
     }
 }

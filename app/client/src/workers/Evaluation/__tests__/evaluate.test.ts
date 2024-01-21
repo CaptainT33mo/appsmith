@@ -1,14 +1,12 @@
-import evaluate, {
-  evaluateAsync,
-  convertAllDataTypesToString,
-} from "workers/Evaluation/evaluate";
-import type { DataTree, WidgetEntity } from "entities/DataTree/dataTreeFactory";
+import evaluate, { evaluateAsync } from "workers/Evaluation/evaluate";
+import type { WidgetEntity } from "@appsmith/entities/DataTree/types";
+import type { DataTree } from "entities/DataTree/dataTreeTypes";
 import { ENTITY_TYPE } from "entities/DataTree/dataTreeFactory";
 import { RenderModes } from "constants/WidgetConstants";
 import setupEvalEnv from "../handlers/setupEvalEnv";
-import { functionDeterminer } from "../functionDeterminer";
 import { resetJSLibraries } from "workers/common/JSLibrary/resetJSLibraries";
 import { EVAL_WORKER_ACTIONS } from "@appsmith/workers/Evaluation/evalWorkerActions";
+import { convertAllDataTypesToString } from "../errorModifier";
 
 describe("evaluateSync", () => {
   const widget: WidgetEntity = {
@@ -79,7 +77,7 @@ describe("evaluateSync", () => {
             message: "wrongJS is not defined",
           },
           errorType: "PARSE",
-          kind: undefined,
+          kind: { category: undefined, rootcause: undefined },
           raw: `
   function $$closedFn () {
     const $$result = wrongJS
@@ -102,7 +100,10 @@ describe("evaluateSync", () => {
             message: "{}.map is not a function",
           },
           errorType: "PARSE",
-          kind: undefined,
+          kind: {
+            category: undefined,
+            rootcause: undefined,
+          },
           raw: `
   function $$closedFn () {
     const $$result = {}.map()
@@ -133,7 +134,10 @@ describe("evaluateSync", () => {
             message: "setImmediate is not defined",
           },
           errorType: "PARSE",
-          kind: undefined,
+          kind: {
+            category: undefined,
+            rootcause: undefined,
+          },
           raw: `
   function $$closedFn () {
     const $$result = setImmediate(() => {}, 100)
@@ -233,42 +237,6 @@ describe("evaluateAsync", () => {
       ],
       result: undefined,
     });
-  });
-});
-
-describe("isFunctionAsync", () => {
-  it("identifies async functions", () => {
-    // eslint-disable-next-line @typescript-eslint/ban-types
-    const cases: Array<{ script: Function | string; expected: boolean }> = [
-      {
-        script: () => {
-          return 1;
-        },
-        expected: false,
-      },
-      {
-        script: () => {
-          return new Promise((resolve) => {
-            resolve(1);
-          });
-        },
-        expected: true,
-      },
-      {
-        script: "() => { showAlert('yo') }",
-        expected: true,
-      },
-    ];
-
-    for (const testCase of cases) {
-      let testFunc = testCase.script;
-      if (typeof testFunc === "string") {
-        testFunc = eval(testFunc);
-      }
-      functionDeterminer.setupEval({}, {});
-      const actual = functionDeterminer.isFunctionAsync(testFunc);
-      expect(actual).toBe(testCase.expected);
-    }
   });
 });
 

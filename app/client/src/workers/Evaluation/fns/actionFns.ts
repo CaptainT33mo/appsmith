@@ -1,6 +1,6 @@
 import { isTrueObject } from "@appsmith/workers/Evaluation/evaluationUtils";
 import { promisify } from "./utils/Promisify";
-import type { ActionEntity } from "entities/DataTree/types";
+import type { ActionEntity } from "@appsmith/entities/DataTree/types";
 
 function runFnDescriptor(
   this: ActionEntity,
@@ -39,11 +39,13 @@ export default async function run(
   const executor = promisify(runFnDescriptor.bind(this));
   try {
     const response = await executor(onSuccessOrParams, onError, params);
-
+    // response is an array of [data, params, responseMeta]
     // @ts-expect-error: globalThis type is not defined
     const action = globalThis[this.name];
     if (action) {
       action.data = response[0];
+      action.responseMeta = response[2];
+      action.isLoading = false;
     }
 
     if (typeof onSuccessOrParams === "function") {

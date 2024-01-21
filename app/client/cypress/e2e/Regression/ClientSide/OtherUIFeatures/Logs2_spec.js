@@ -1,5 +1,10 @@
 import commonlocators from "../../../../locators/commonlocators.json";
 import * as _ from "../../../../support/Objects/ObjectsCore";
+import EditorNavigation, {
+  EntityType,
+  PageLeftPane,
+  PagePaneSegment,
+} from "../../../../support/Pages/EditorNavigation";
 
 let logString;
 
@@ -15,7 +20,7 @@ describe("Debugger logs", function () {
   });
 
   it("1. Console log on text widget with normal moustache binding", function () {
-    _.entityExplorer.NavigateToSwitcher("Widgets");
+    PageLeftPane.switchSegment(PagePaneSegment.UI);
     _.entityExplorer.DragDropWidgetNVerify("textwidget", 400, 400);
     _.propPane.UpdatePropertyFieldValue(
       "Text",
@@ -28,14 +33,13 @@ describe("Debugger logs", function () {
     );
     _.agHelper.RefreshPage();
     // Wait for the debugger icon to be visible
-    _.agHelper.AssertElementVisible(".t--debugger-count");
+    _.agHelper.AssertElementVisibility(".t--debugger-count");
     _.debuggerHelper.ClickDebuggerIcon();
     _.agHelper.GetNClick(_.jsEditor._logsTab);
     _.debuggerHelper.DoesConsoleLogExist(logString);
   });
 
   it("2. Console log in sync function", function () {
-    _.entityExplorer.NavigateToSwitcher("Explorer");
     _.jsEditor.CreateJSObject(
       `export default {
         myFun1: () => {
@@ -59,7 +63,6 @@ describe("Debugger logs", function () {
   });
 
   it("3. Console log in async function", function () {
-    _.entityExplorer.NavigateToSwitcher("Explorer");
     _.jsEditor.CreateJSObject(
       `export default {
         myFun1: async () => {
@@ -98,7 +101,6 @@ describe("Debugger logs", function () {
   });
 
   it("4. Console log after API succedes", function () {
-    _.entityExplorer.NavigateToSwitcher("Explorer");
     cy.fixture("testdata").then(function (dataSet) {
       _.apiPage.CreateAndFillApi(dataSet.baseUrl + dataSet.methods, "Api1");
     });
@@ -150,7 +152,6 @@ describe("Debugger logs", function () {
   });
 
   it("5. Console log after API execution fails", function () {
-    _.entityExplorer.NavigateToSwitcher("Explorer");
     cy.fixture("testdata").then(function (dataSet) {
       _.apiPage.CreateAndFillApi(
         dataSet.baseUrl + dataSet.methods + "xyz",
@@ -238,7 +239,6 @@ describe("Debugger logs", function () {
   });
 
   it("8. Console log should not mutate the passed object", function () {
-    _.entityExplorer.NavigateToSwitcher("Explorer");
     _.jsEditor.CreateJSObject(
       `export default {
         myFun1: () => {
@@ -284,28 +284,27 @@ describe("Debugger logs", function () {
       shouldCreateNewJSObj: true,
     });
 
-    _.entityExplorer.SelectEntityByName("Page1", "Pages");
+    EditorNavigation.SelectEntityByName("Page1", EntityType.Page);
     _.agHelper.GetNClick(_.locators._errorTab);
 
-    _.debuggerHelper.ClicklogEntityLink(0);
+    _.debuggerHelper.ClicklogEntityLink();
 
     cy.get(".t--js-action-name-edit-field").should("exist");
   });
 
   it("10. Bug #24039 - Logs errors from setInterval callback into debugger", () => {
-    _.entityExplorer.NavigateToSwitcher("Widgets");
     _.entityExplorer.DragDropWidgetNVerify("buttonwidget", 400, 600);
-    _.entityExplorer.SelectEntityByName("Button1", "Widgets");
+    EditorNavigation.SelectEntityByName("Button1", EntityType.Widget);
     _.propPane.SelectPlatformFunction("onClick", "Set interval");
     _.agHelper.EnterActionValue(
       "Callback function",
-      `{{() => { 
+      `{{() => {
         try {
           Test.run();
         } catch (e) {
           clearInterval('myInterval');
           throw e;
-        } 
+        }
       }
       }}`,
     );

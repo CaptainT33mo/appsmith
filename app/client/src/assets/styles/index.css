@@ -56,13 +56,6 @@ and .Toastify__toast-container--bottom-center classes, which messes with the pla
   opacity: 0.5;
 }
 
-.diagnol-cross {
-  background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' version='1.1' preserveAspectRatio='none' viewBox='0 0 100 100'><path d='M0 99 L99 0 L100 1 L1 100' fill='red' /></svg>");
-  background-repeat: no-repeat;
-  background-position: center center;
-  background-size: 100% 100%, auto;
-}
-
 .hidden-scrollbar {
   -ms-overflow-style: none; /* for Internet Explorer, Edge */
   scrollbar-width: none; /* for Firefox */
@@ -76,4 +69,20 @@ and .Toastify__toast-container--bottom-center classes, which messes with the pla
 input::placeholder,
 textarea::placeholder {
   color: var(--ads-v2-color-fg-subtle);
+}
+
+.resize-wrapper {
+  display: block;
+  outline-offset: 1px;
+  outline: 1px solid !important;
+  will-change: outline-color;
+  outline-color: transparent !important;
+}
+
+.show-boundary {
+  outline-color: #fafafa !important;
+}
+
+.pointer-event-none {
+  pointer-events: none;
 }

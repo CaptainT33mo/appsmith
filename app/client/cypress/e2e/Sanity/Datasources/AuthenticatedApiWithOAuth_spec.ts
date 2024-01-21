@@ -2,12 +2,15 @@ import {
   agHelper,
   apiPage,
   dataSources,
+  dataManager,
 } from "../../../support/Objects/ObjectsCore";
 
-describe("Authentiacted Api with OAuth 2.O authorization code test cases", function () {
-  it("1. Create & Save an Authenticated API with OAuth 2.O authorization code", function () {
-    // Create OAuth client
-    cy.fixture("datasources").then((datasourceFormData: any) => {
+describe(
+  "Authentiacted Api with OAuth 2.O authorization code test cases",
+  { tags: ["@tag.Datasource", "@tag.Sanity"] },
+  function () {
+    it("1. Create & Save an Authenticated API with OAuth 2.O authorization code", function () {
+      // Create OAuth client
       dataSources.CreateOAuthClient("authorization_code");
       // Create datasource
       agHelper.GenerateUUID();
@@ -22,7 +25,8 @@ describe("Authentiacted Api with OAuth 2.O authorization code test cases", funct
             );
             //Create API from datasource
             apiPage.CreateAndFillApi(
-              datasourceFormData["OAuth_ApiUrl"] + "/api/echo/get?ASDSA=ASDSA",
+              dataManager.dsValues[dataManager.defaultEnviorment].OAuth_ApiUrl +
+                "/api/echo/get?ASDSA=ASDSA",
               "EchoOauth",
               10000,
               "GET",
@@ -31,9 +35,9 @@ describe("Authentiacted Api with OAuth 2.O authorization code test cases", funct
           });
         });
       });
+      //Run API & Validate Response
+      apiPage.RunAPI();
+      apiPage.ResponseStatusCheck("200");
     });
-    //Run API & Validate Response
-    apiPage.RunAPI();
-    apiPage.ResponseStatusCheck("200");
-  });
-});
+  },
+);

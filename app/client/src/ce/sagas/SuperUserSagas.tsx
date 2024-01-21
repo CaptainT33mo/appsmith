@@ -26,16 +26,19 @@ import { getCurrentTenant } from "@appsmith/actions/tenantActions";
 import { toast } from "design-system";
 import AnalyticsUtil from "utils/AnalyticsUtil";
 import {
+  MIGRATION_STATUS,
   RESTART_POLL_INTERVAL,
   RESTART_POLL_TIMEOUT,
 } from "@appsmith/constants/tenantConstants";
+import type { FetchCurrentTenantConfigResponse } from "@appsmith/api/TenantApi";
+import TenantApi from "@appsmith/api/TenantApi";
 
 export function* FetchAdminSettingsSaga() {
   const response: ApiResponse = yield call(UserApi.fetchAdminSettings);
   const isValidResponse: boolean = yield validateResponse(response);
 
   if (isValidResponse) {
-    const { appVersion, cloudHosting } = getAppsmithConfigs();
+    const { appVersion } = getAppsmithConfigs();
     const settings = {
       //@ts-expect-error: response is of type unknown
       ...response.data,
@@ -43,7 +46,6 @@ export function* FetchAdminSettingsSaga() {
         APPSMITH_DISPLAY_VERSION,
         appVersion.edition,
         appVersion.id,
-        cloudHosting,
       ),
     };
 
@@ -79,7 +81,6 @@ export function* SaveAdminSettingsSaga(
   const { needsRestart = true, settings } = action.payload;
 
   try {
-    const { appVersion } = getAppsmithConfigs();
     const hasDisableTelemetrySetting = settings.hasOwnProperty(
       "APPSMITH_DISABLE_TELEMETRY",
     );
@@ -98,14 +99,11 @@ export function* SaveAdminSettingsSaga(
       });
 
       if (settings["APPSMITH_DISABLE_TELEMETRY"]) {
-        AnalyticsUtil.logEvent("TELEMETRY_DISABLED", {
-          version: appVersion.id,
-        });
+        AnalyticsUtil.logEvent("TELEMETRY_DISABLED");
       }
 
       if (hasDisableTelemetrySetting || hasHideWatermarkSetting) {
         AnalyticsUtil.logEvent("GENERAL_SETTINGS_UPDATE", {
-          version: appVersion.id,
           ...(hasDisableTelemetrySetting
             ? { telemetry_disabled: settings["APPSMITH_DISABLE_TELEMETRY"] }
             : {}),
@@ -155,8 +153,14 @@ export function* RestryRestartServerPoll() {
     pollCount++;
     yield delay(RESTART_POLL_INTERVAL);
     try {
-      const response: ApiResponse = yield call(UserApi.getCurrentUser);
-      if (response.responseMeta.status === 200) {
+      const response: FetchCurrentTenantConfigResponse = yield call(
+        TenantApi.fetchCurrentTenantConfig,
+      );
+      if (
+        response.responseMeta.status === 200 &&
+        response.data?.tenantConfiguration?.migrationStatus ===
+          MIGRATION_STATUS.COMPLETED
+      ) {
         window.location.reload();
       }
     } catch (e) {}

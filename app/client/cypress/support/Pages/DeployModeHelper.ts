@@ -15,6 +15,13 @@ export class DeployMode {
     `//p[text()='${fieldName}']/ancestor::div[@direction='column']//div[@data-testid='radiogroup-container']//input`;
   _jsonFormDatepickerFieldByName = (fieldName: string) =>
     `//p[text()='${fieldName}']/ancestor::div[@direction='column']//div[@data-testid='datepicker-container']//input`;
+  _jsonFormNumberFieldByName = (
+    fieldName: string,
+    direction: "up" | "down" = "up",
+  ) =>
+    `//p[text()='${fieldName}']/ancestor::div[@direction='column']//div[@data-testid='input-container']// ${
+      direction == "up" ? this.locator._chevronUp : this.locator._chevronDown
+    }`;
   _jsonSelectDropdown = "button.select-button";
   private _jsonFormMultiSelectByName = (fieldName: string) =>
     `//p[text()='${fieldName}']/ancestor::div[@direction='column']//div[@data-testid='multiselect-container']//div[contains(@class, 'rc-select-show-arrow')]`;
@@ -24,31 +31,23 @@ export class DeployMode {
   private _backtoHome =
     ".t--app-viewer-navigation-header .t--app-viewer-back-to-apps-button";
   private _homeAppsmithImage = "a.t--appsmith-logo";
-  public envInfoModal = `[data-testid="t--env-info-modal"]`;
-  public envInfoModalDeployButton = `[data-testid="t--env-info-modal-deploy-button"]`;
 
   //refering PublishtheApp from command.js
   public DeployApp(
-    eleToCheckInDeployPage: string = this.locator._backToEditor,
+    eleToCheckInDeployPage?: string,
     toCheckFailureToast = true,
     toValidateSavedState = true,
     addDebugFlag = true,
-    assertEnvInfoModal = false,
   ) {
     //cy.intercept("POST", "/api/v1/applications/publish/*").as("publishAppli");
 
     // Wait before publish
-    this.agHelper.Sleep(3000); //wait for elements settle!
+    this.agHelper.Sleep(); //wait for elements settle!
     toValidateSavedState && this.agHelper.AssertAutoSave();
     // Stubbing window.open to open in the same tab
     this.assertHelper.AssertDocumentReady();
     this.StubbingDeployPage(addDebugFlag);
     this.agHelper.ClickButton("Deploy");
-    if (assertEnvInfoModal) {
-      this.agHelper.WaitUntilEleAppear(this.envInfoModal);
-      this.agHelper.AssertElementExist(this.envInfoModal);
-    }
-    this.agHelper.GetNClickIfPresent(this.envInfoModalDeployButton);
     this.agHelper.AssertElementAbsence(this.locator._btnSpinner, 10000); //to make sure we have started navigation from Edit page
     //cy.get("@windowDeployStub").should("be.calledOnce");
     this.assertHelper.AssertDocumentReady();
@@ -60,7 +59,9 @@ export class DeployMode {
     //   .should("not.contain", "edit");
     //cy.wait('@publishApp').wait('@publishApp') //waitng for 2 calls to complete
 
-    this.agHelper.WaitUntilEleAppear(eleToCheckInDeployPage);
+    this.agHelper.WaitUntilEleAppear(
+      eleToCheckInDeployPage ?? this.locator._backToEditor,
+    );
     localStorage.setItem("inDeployedMode", "true");
     toCheckFailureToast &&
       this.agHelper.AssertElementAbsence(
@@ -71,8 +72,8 @@ export class DeployMode {
   }
 
   // Stubbing window.open to open in the same tab
-  public StubbingWindow() {
-    cy.window({ timeout: 60000 }).then((window: any) => {
+  public StubbingWindow(timeout = 60000) {
+    cy.window({ timeout }).then((window: any) => {
       cy.stub(window, "open")
         .as("windowStub")
         .callsFake((url) => {
@@ -123,34 +124,68 @@ export class DeployMode {
     networkCall: string,
   ) {
     this.StubbingWindow();
-    this.agHelper.GetNClick(selector, 0, false, 4000); //timeout new url to settle loading
+    this.agHelper.GetNClick(selector, 0, false, 0);
+    // cy.window().then((win) => {
+    //   win.location.reload();
+    // });
+    this.agHelper.Sleep(4000); //Waiting a bit for new url to settle loading
+    // cy.url().then((url) => {
+    //   cy.window().then((window) => {
+    //     window.location.href = url;
+    //   }); //only reload page to get new url
+    // });
     cy.get("@windowStub").should("be.calledOnce");
     cy.url().should("contain", expectedUrl);
-    this.assertHelper.AssertDocumentReady();
+    this.agHelper.Sleep(2000); //stay in the page a bit before navigating back
+    //this.assertHelper.AssertDocumentReady();
     cy.window({ timeout: 60000 }).then((win) => {
       win.history.back();
     });
-    this.assertHelper.AssertNetworkStatus("@" + networkCall);
+    this.assertHelper.AssertNetworkResponseData("@" + networkCall);
     this.assertHelper.AssertDocumentReady();
   }
 
-  public NavigateBacktoEditor() {
+  public NavigateBacktoEditor(toastToCheck = "") {
     this.assertHelper.AssertDocumentReady();
     this.agHelper.GetNClick(this.locator._backToEditor, 0, true);
-    this.agHelper.Sleep(2000);
+    this.agHelper.Sleep();
     localStorage.setItem("inDeployedMode", "false");
+    if (toastToCheck) {
+      this.agHelper.ValidateToastMessage(toastToCheck);
+    }
+    //Assert no error toast in Edit mode when navigating back from Deploy mode
     this.agHelper.AssertElementAbsence(
-      this.locator._specificToast("There was an unexpcted error"),
-    ); //Assert that is not error toast in Edit mode when navigating back from Deploy mode
-    this.assertHelper.AssertDocumentReady();
+      this.locator._specificToast("There was an unexpected error"),
+    );
+    this.agHelper.AssertElementAbsence(
+      this.locator._specificToast(
+        "Internal server error while processing request",
+      ),
+    );
+    this.agHelper.AssertElementAbsence(
+      this.locator._specificToast("Cannot read properties of undefined"),
+    );
+    this.assertHelper.AssertNetworkResponseData("@getPluginForm"); //for auth rest api
+    this.assertHelper.AssertNetworkResponseData("@getPluginForm"); //for graphql
     this.assertHelper.AssertNetworkStatus("@getWorkspace");
-    this.agHelper.AssertElementVisible(this.locator._editPage); //Assert if canvas is visible after Navigating back!
+
+    // cy.window().then((win) => {
+    //   win.location.reload();
+    // });
+    // cy.url().then((url) => {//also not working consistently!
+    //   cy.window().then((window) => {
+    //     window.location.href = url;
+    //   }); // //only reloading edit page to load elements
+    // });
+    this.assertHelper.AssertDocumentReady();
+    //this.agHelper.Sleep(2000);
+    this.agHelper.AssertElementVisibility(this.locator._editPage); //Assert if canvas is visible after Navigating back!
   }
 
   public NavigateToHomeDirectly() {
     this.agHelper.GetNClick(this._backtoHome);
     this.agHelper.Sleep(2000);
-    this.agHelper.AssertElementVisible(this._homeAppsmithImage);
+    this.agHelper.AssertElementVisibility(this._homeAppsmithImage);
   }
 
   public EnterJSONInputValue(

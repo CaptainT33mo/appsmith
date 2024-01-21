@@ -51,9 +51,14 @@ import {
   getPluginForm,
   getPlugins,
   getSettingConfig,
-} from "selectors/entitiesSelector";
+} from "@appsmith/selectors/entitiesSelector";
 import type { Action } from "entities/Action";
-import { isAPIAction, isQueryAction, isSaaSAction } from "entities/Action";
+import {
+  isAIAction,
+  isAPIAction,
+  isQueryAction,
+  isSaaSAction,
+} from "entities/Action";
 import { API_EDITOR_TABS } from "constants/ApiEditorConstants/CommonApiConstants";
 import { EDITOR_TABS } from "constants/QueryEditorConstants";
 import _, { isEmpty } from "lodash";
@@ -76,14 +81,14 @@ import { AppThemingMode } from "selectors/appThemingSelectors";
 import { generateAutoHeightLayoutTreeAction } from "actions/autoHeightActions";
 import { SelectionRequestType } from "sagas/WidgetSelectUtils";
 import { startFormEvaluations } from "actions/evaluationActions";
-import { getCurrentEnvironment } from "@appsmith/utils/Environments";
 import { getUIComponent } from "pages/Editor/QueryEditor/helpers";
 import type { Plugin } from "api/PluginApi";
 import { UIComponentTypes } from "api/PluginApi";
+import { getCurrentEnvironmentId } from "@appsmith/selectors/environmentSelectors";
 
-export type UndoRedoPayload = {
+export interface UndoRedoPayload {
   operation: ReplayReduxActionTypes;
-};
+}
 
 export default function* undoRedoListenerSaga() {
   yield all([
@@ -303,7 +308,9 @@ function* replayActionSaga(
 
   //Reinitialize form
   const currentFormName =
-    isQueryAction(replayEntity) || isSaaSAction(replayEntity)
+    isQueryAction(replayEntity) ||
+    isSaaSAction(replayEntity) ||
+    isAIAction(replayEntity)
       ? QUERY_EDITOR_FORM_NAME
       : API_EDITOR_FORM_NAME;
   yield put(initialize(currentFormName, replayEntity));
@@ -317,7 +324,7 @@ function* replayActionSaga(
    * Update all the diffs in the action object.
    * We need this for debugger logs, dynamicBindingPathList and to call relevant APIs */
 
-  const currentEnvironment = getCurrentEnvironment();
+  const currentEnvironment: string = yield select(getCurrentEnvironmentId);
   const plugins: Plugin[] = yield select(getPlugins);
   const uiComponent = getUIComponent(replayEntity.pluginId, plugins);
   const datasource: Datasource | undefined = yield select(

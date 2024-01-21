@@ -1,7 +1,13 @@
 import { ReduxActionTypes } from "@appsmith/constants/ReduxActionConstants";
-import type { ENTITY_TYPE, Log, Message } from "entities/AppsmithConsole";
+import type {
+  ENTITY_TYPE,
+  Log,
+  Message,
+  SourceEntity,
+} from "entities/AppsmithConsole";
 import type { DebuggerContext } from "reducers/uiReducers/debuggerReducer";
-import type { EventName } from "utils/AnalyticsUtil";
+import type { EventName } from "@appsmith/utils/analyticsUtilTypes";
+import type { APP_MODE } from "entities/App";
 
 export interface LogDebuggerErrorAnalyticsPayload {
   entityName: string;
@@ -15,6 +21,11 @@ export interface LogDebuggerErrorAnalyticsPayload {
   errorType?: Message["type"];
   errorSubType?: Message["subType"];
   analytics?: Log["analytics"];
+  appMode: APP_MODE;
+  source: SourceEntity;
+  logId: string;
+  environmentId?: string;
+  environmentName?: string;
 }
 
 export const debuggerLogInit = (payload: Log[]) => ({
@@ -59,14 +70,6 @@ export const deleteErrorLog = (ids: string[]) => ({
   payload: ids,
 });
 
-// Only used for analytics
-export const logDebuggerErrorAnalytics = (
-  payload: LogDebuggerErrorAnalyticsPayload,
-) => ({
-  type: ReduxActionTypes.DEBUGGER_ERROR_ANALYTICS,
-  payload,
-});
-
 export const hideDebuggerErrors = (payload: boolean) => ({
   type: ReduxActionTypes.HIDE_DEBUGGER_ERRORS,
   payload,
@@ -77,6 +80,14 @@ export const setDebuggerSelectedTab = (selectedTab: string) => {
   return {
     type: ReduxActionTypes.SET_DEBUGGER_SELECTED_TAB,
     selectedTab,
+  };
+};
+
+// set the selected filter in the debugger.
+export const setDebuggerSelectedFilter = (selectedFilter: string) => {
+  return {
+    type: ReduxActionTypes.SET_DEBUGGER_SELECTED_FILTER,
+    selectedFilter,
   };
 };
 

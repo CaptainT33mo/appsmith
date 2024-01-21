@@ -1,5 +1,11 @@
-import type { DataTree } from "entities/DataTree/dataTreeFactory";
-import { errorModifier } from "../errorModifier";
+import type { DataTree } from "entities/DataTree/dataTreeTypes";
+import {
+  ActionInDataFieldErrorModifier,
+  TypeErrorModifier,
+  errorModifier,
+} from "../errorModifier";
+import DependencyMap from "entities/DependencyMap";
+import { APP_MODE } from "entities/App";
 
 describe("Test error modifier", () => {
   const dataTree = {
@@ -121,18 +127,24 @@ describe("Test error modifier", () => {
   } as unknown as DataTree;
 
   beforeAll(() => {
-    errorModifier.updateAsyncFunctions(dataTree, {});
+    const dependencyMap = new DependencyMap();
+    errorModifier.init(APP_MODE.EDIT);
+    errorModifier.updateAsyncFunctions(dataTree, {}, dependencyMap);
   });
 
   it("TypeError for defined Api in data field ", () => {
     const error = new Error();
     error.name = "TypeError";
     error.message = "Api2.run is not a function";
-    const { errorMessage: result } = errorModifier.run(error);
+    const { errorMessage: result } = errorModifier.run(
+      error,
+      { userScript: "", source: "" },
+      [ActionInDataFieldErrorModifier, TypeErrorModifier],
+    );
     expect(result).toEqual({
       name: "ValidationError",
       message:
-        "Found a reference to Api2.run() during evaluation. Data fields cannot execute framework actions. Please remove any direct/indirect references to Api2.run() and try again.",
+        "Please remove any direct/indirect references to Api2.run() and try again. Data fields cannot execute framework actions.",
     });
   });
 
@@ -140,7 +152,11 @@ describe("Test error modifier", () => {
     const error = new Error();
     error.name = "TypeError";
     error.message = "Api1.run is not a function";
-    const { errorMessage: result } = errorModifier.run(error);
+    const { errorMessage: result } = errorModifier.run(
+      error,
+      { userScript: "", source: "" },
+      [ActionInDataFieldErrorModifier, TypeErrorModifier],
+    );
     expect(result).toEqual({
       name: "TypeError",
       message: "Api1.run is not a function",
@@ -151,11 +167,15 @@ describe("Test error modifier", () => {
     const error = new Error();
     error.name = "ReferenceError";
     error.message = "storeValue is not defined";
-    const { errorMessage: result } = errorModifier.run(error);
+    const { errorMessage: result } = errorModifier.run(
+      error,
+      { userScript: "", source: "" },
+      [ActionInDataFieldErrorModifier, TypeErrorModifier],
+    );
     expect(result).toEqual({
       name: "ValidationError",
       message:
-        "Found a reference to storeValue() during evaluation. Data fields cannot execute framework actions. Please remove any direct/indirect references to storeValue() and try again.",
+        "Please remove any direct/indirect references to storeValue() and try again. Data fields cannot execute framework actions.",
     });
   });
 
@@ -163,7 +183,11 @@ describe("Test error modifier", () => {
     const error = new Error();
     error.name = "ReferenceError";
     error.message = "storeValue2 is not defined";
-    const { errorMessage: result } = errorModifier.run(error);
+    const { errorMessage: result } = errorModifier.run(
+      error,
+      { userScript: "", source: "" },
+      [ActionInDataFieldErrorModifier, TypeErrorModifier],
+    );
     expect(result).toEqual({
       name: error.name,
       message: error.message,

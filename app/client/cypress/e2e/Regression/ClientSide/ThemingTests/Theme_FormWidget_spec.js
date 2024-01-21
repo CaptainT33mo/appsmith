@@ -8,6 +8,9 @@ import {
   theme,
   draggableWidgets,
 } from "../../../../support/Objects/ObjectsCore";
+import EditorNavigation, {
+  EntityType,
+} from "../../../../support/Pages/EditorNavigation";
 
 const widgetsPage = require("../../../../locators/Widgets.json");
 const commonlocators = require("../../../../locators/commonlocators.json");
@@ -17,7 +20,7 @@ const themelocator = require("../../../../locators/ThemeLocators.json");
 let themeBackgroudColor;
 let themeFont;
 
-describe("Theme validation usecases", function () {
+describe("Theme validation usecases", { tags: ["@tag.Theme"] }, function () {
   it("1. Drag and drop form widget and validate Default font and list of font validation", function () {
     entityExplorer.DragDropWidgetNVerify(draggableWidgets.FORM);
     agHelper.GetNClick(locators._canvas);
@@ -93,7 +96,7 @@ describe("Theme validation usecases", function () {
           cy.get(themelocator.inputColor).clear({ force: true });
           cy.wait(2000);
           theme.ChangeThemeColor(16, "Background");
-          cy.get(themelocator.inputColor).should("have.value", "#dc2626"); //Red
+          cy.get(themelocator.inputColor).should("have.value", "#86efac"); //Red
           cy.wait(2000);
 
           cy.get(themelocator.inputColor).eq(0).click({ force: true });
@@ -107,7 +110,7 @@ describe("Theme validation usecases", function () {
           cy.get(themelocator.inputColor).clear({ force: true });
           cy.wait(2000);
           theme.ChangeThemeColor(9, "Primary");
-          cy.get(themelocator.inputColor).should("have.value", "#18181b"); //Black
+          cy.get(themelocator.inputColor).should("have.value", "#7f1d1d"); //Black
           cy.wait(2000);
           cy.contains("Color").click({ force: true });
           appSettings.ClosePane();
@@ -161,7 +164,7 @@ describe("Theme validation usecases", function () {
   });
 
   it("3. Validate Theme change across application", function () {
-    entityExplorer.SelectEntityByName("FormTest");
+    EditorNavigation.SelectEntityByName("FormTest", EntityType.Widget);
     propPane.MoveToTab("Style");
     cy.get(widgetsPage.backgroundcolorPickerNew).first().click({ force: true });
     cy.get("[style='background-color: rgb(21, 128, 61);']").last().click();
@@ -222,7 +225,7 @@ describe("Theme validation usecases", function () {
             appSettings.ClosePane();
           });
       });
-    entityExplorer.SelectEntityByName("FormTest");
+    EditorNavigation.SelectEntityByName("FormTest", EntityType.Widget);
     propPane.MoveToTab("Style");
     cy.get(widgetsPage.backgroundcolorPickerNew).first().click({ force: true });
     cy.get("[style='background-color: rgb(126, 34, 206);']").first().click();

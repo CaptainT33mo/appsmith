@@ -1,7 +1,6 @@
 import React from "react";
-import { Text, Link, Button, Icon, Tag } from "design-system";
+import { Text, Link, Button, Icon } from "design-system";
 import {
-  BUSINESS_TEXT,
   createMessage,
   IN_APP_EMBED_SETTING,
 } from "@appsmith/constants/messages";
@@ -15,7 +14,13 @@ import {
   RampSection,
 } from "utils/ProductRamps/RampsControlList";
 import { useSelector } from "react-redux";
-import { getRampLink, showProductRamps } from "selectors/rampSelectors";
+import {
+  getRampLink,
+  showProductRamps,
+} from "@appsmith/selectors/rampSelectors";
+import BusinessTag from "components/BusinessTag";
+import { FEATURE_FLAG } from "@appsmith/entities/FeatureFlag";
+import { useFeatureFlag } from "utils/hooks/useFeatureFlag";
 
 function PrivateEmbeddingContent(props: {
   userAppPermissions: any[];
@@ -48,7 +53,14 @@ export function PrivateEmbedRampModal() {
     feature: RampFeature.PrivateEmbeds,
   });
   const rampLink = useSelector(rampLinkSelector);
-  const showRampSelector = showProductRamps(RAMP_NAME.PRIVATE_EMBED);
+  const isPrivateEmbedEnabled = useFeatureFlag(
+    FEATURE_FLAG.license_private_embeds_enabled,
+  );
+  const showRampSelector = showProductRamps(
+    RAMP_NAME.PRIVATE_EMBED,
+    false,
+    isPrivateEmbedEnabled,
+  );
   const canShowRamp = useSelector(showRampSelector);
   if (canShowRamp) {
     return (
@@ -59,9 +71,7 @@ export function PrivateEmbedRampModal() {
             <Text kind="body-m">
               {createMessage(IN_APP_EMBED_SETTING.privateAppsText)}
             </Text>
-            <Tag className="ml-1 mt-0.5" isClosable={false}>
-              {createMessage(BUSINESS_TEXT)}
-            </Tag>
+            <BusinessTag classes="ml-1 mt-0.5" />
           </div>
           <Text
             className="w-7/10 block"
@@ -91,7 +101,14 @@ export function PrivateEmbedRampSidebar() {
     feature: RampFeature.PrivateEmbeds,
   });
   const rampLink = useSelector(rampLinkSelector);
-  const showRampSelector = showProductRamps(RAMP_NAME.PRIVATE_EMBED);
+  const isPrivateEmbedEnabled = useFeatureFlag(
+    FEATURE_FLAG.license_private_embeds_enabled,
+  );
+  const showRampSelector = showProductRamps(
+    RAMP_NAME.PRIVATE_EMBED,
+    false,
+    isPrivateEmbedEnabled,
+  );
   const canShowRamp = useSelector(showRampSelector);
   if (canShowRamp) {
     return (

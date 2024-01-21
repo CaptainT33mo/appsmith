@@ -1,87 +1,29 @@
-import DataTreeEvaluator from "workers/common/DataTreeEvaluator";
-import {
-  unEvalTree,
-  unEvalTreeWidgetSelectWidget,
-} from "workers/common/DataTreeEvaluator/mockData/mockUnEvalTree";
-import ButtonWidget, {
-  CONFIG as BUTTON_WIDGET_CONFIG,
-} from "widgets/ButtonWidget";
-import SelectWidget, {
-  CONFIG as SELECT_WIDGET_CONFIG,
-} from "widgets/SelectWidget";
+import ButtonWidget from "widgets/ButtonWidget";
+import SelectWidget from "widgets/SelectWidget";
 import type {
-  DataTree,
-  ConfigTree,
   WidgetEntity,
   DataTreeEntityConfig,
-} from "entities/DataTree/dataTreeFactory";
-import {
-  unEvalTreeWidgetSelectWidgetConfig,
-  configTree,
-} from "workers/common/DataTreeEvaluator/mockData/mockConfigTree";
-
-import { listEntityPathDependencies } from "./utils";
+} from "@appsmith/entities/DataTree/types";
+import { getEntityPathDependencies } from "./utils/getEntityDependencies";
+import type BaseWidget from "widgets/BaseWidget";
 
 const widgetConfigMap = {};
 
-[
-  [ButtonWidget, BUTTON_WIDGET_CONFIG],
-  [SelectWidget, SELECT_WIDGET_CONFIG],
-].map(([, config]) => {
-  // @ts-expect-error: Types are not available
-  if (config.type && config.properties) {
+[ButtonWidget, SelectWidget].forEach((widget: typeof BaseWidget) => {
+  if (widget.type) {
     // @ts-expect-error: Types are not available
-    widgetConfigMap[config.type] = {
-      // @ts-expect-error: properties does not exists
-      defaultProperties: config.properties.default,
-      // @ts-expect-error: properties does not exists
-      derivedProperties: config.properties.derived,
-      // @ts-expect-error: properties does not exists
-      metaProperties: config.properties.meta,
+    widgetConfigMap[widget.type] = {
+      defaultProperties: widget.getDefaultPropertiesMap(),
+
+      derivedProperties: widget.getDerivedPropertiesMap(),
+
+      metaProperties: widget.getMetaPropertiesMap(),
     };
   }
 });
 
-const dataTreeEvaluator = new DataTreeEvaluator(widgetConfigMap);
-
-describe("test validationDependencyMap", () => {
-  beforeAll(() => {
-    dataTreeEvaluator.setupFirstTree(
-      unEvalTreeWidgetSelectWidget as unknown as DataTree,
-      unEvalTreeWidgetSelectWidgetConfig as unknown as ConfigTree,
-    );
-    dataTreeEvaluator.evalAndValidateFirstTree();
-  });
-
-  it("initial validation dependencyMap computation", () => {
-    expect(dataTreeEvaluator.validationDependencyMap).toStrictEqual({
-      "Select2.defaultOptionValue": [
-        "Select2.serverSideFiltering",
-        "Select2.options",
-      ],
-    });
-  });
-
-  it("update validation dependencyMap computation", () => {
-    const { evalOrder, nonDynamicFieldValidationOrder, unEvalUpdates } =
-      dataTreeEvaluator.setupUpdateTree(
-        unEvalTree as unknown as DataTree,
-        configTree as unknown as ConfigTree,
-      );
-
-    dataTreeEvaluator.evalAndValidateSubTree(
-      evalOrder,
-      nonDynamicFieldValidationOrder,
-      configTree as unknown as ConfigTree,
-      unEvalUpdates,
-    );
-
-    expect(dataTreeEvaluator.validationDependencyMap).toStrictEqual({});
-  });
-});
-
 describe("DependencyMap utils", function () {
-  test("listEntityPathDependencies", () => {
+  test("getEntityPathDependencies", () => {
     const entity = {
       ENTITY_TYPE: "WIDGET",
       isVisible: true,
@@ -180,10 +122,11 @@ describe("DependencyMap utils", function () {
       },
     } as unknown as DataTreeEntityConfig;
 
-    const actualResult = listEntityPathDependencies(
+    const actualResult = getEntityPathDependencies(
       entity,
-      "Button1.onClick",
       entityConfig,
+      "Button1.onClick",
+      {},
     );
 
     expect([]).toStrictEqual(actualResult);
@@ -339,10 +282,11 @@ describe("DependencyMap utils", function () {
       propertyOverrideDependency: {},
       overridingPropertyPaths: {},
     } as unknown as DataTreeEntityConfig;
-    const result = listEntityPathDependencies(
+    const result = getEntityPathDependencies(
       entity2,
-      "Button1.googleRecaptchaKey",
       entityConfig2,
+      "Button1.googleRecaptchaKey",
+      {},
     );
     const expected = ["JSObject.myVar1"];
 

@@ -41,7 +41,7 @@ public class MustacheHelper {
      * {{JSON.stringify(fetchUsers)}}
      * This pattern should return ["JSON.stringify", "fetchUsers"]
      */
-    private static final Pattern pattern = Pattern.compile("[a-zA-Z_][a-zA-Z0-9._]*");
+    private static final Pattern pattern = Pattern.compile("[a-zA-Z_][a-zA-Z0-9._$]*");
     /**
      * Appsmith smart replacement : The regex pattern below looks for '?' or "?". This pattern is later replaced with ?
      * to fit the requirements of prepared statements.
@@ -68,7 +68,7 @@ public class MustacheHelper {
 
     // Possible types of entity references that we want to be filtering
     // from the global identifiers found in a dynamic binding
-    public static final int ACTION_ENTITY_REFERENCES = 0b01;
+    public static final int EXECUTABLE_ENTITY_REFERENCES = 0b01;
     public static final int WIDGET_ENTITY_REFERENCES = 0b10;
 
     /**
@@ -372,7 +372,7 @@ public class MustacheHelper {
             String bindingValue = tuple.getT1();
             HashSet<EntityDependencyNode> totalParents = new HashSet<>();
             tuple.getT2().forEach(reference -> {
-                if ((types & ACTION_ENTITY_REFERENCES) == ACTION_ENTITY_REFERENCES) {
+                if ((types & EXECUTABLE_ENTITY_REFERENCES) == EXECUTABLE_ENTITY_REFERENCES) {
                     totalParents.addAll(MustacheHelper.getPossibleActions(reference));
                 }
                 if ((types & WIDGET_ENTITY_REFERENCES) == WIDGET_ENTITY_REFERENCES) {
@@ -407,7 +407,7 @@ public class MustacheHelper {
             return dependencyNodes;
         } else {
             EntityDependencyNode entityDependencyNode =
-                    new EntityDependencyNode(EntityReferenceType.WIDGET, subStrings[0], reference, null, null, null);
+                    new EntityDependencyNode(EntityReferenceType.WIDGET, subStrings[0], reference, null, null);
             dependencyNodes.add(entityDependencyNode);
         }
 
@@ -446,21 +446,21 @@ public class MustacheHelper {
             // This could qualify if it is a sync JS function call, even if it is called `JsObject1.data()`
             // For sync JS actions, the entire reference could be a function call
             EntityDependencyNode entityDependencyNode =
-                    new EntityDependencyNode(EntityReferenceType.JSACTION, key, reference, false, true, null);
+                    new EntityDependencyNode(EntityReferenceType.JSACTION, key, reference, false, null);
             dependencyNodes.add(entityDependencyNode);
             if ("data".equals(subStrings[1])) {
                 // This means it is a valid API/query reference
                 // For queries and APIs, the first word is the action name
-                EntityDependencyNode actionEntityDependencyNode = new EntityDependencyNode(
-                        EntityReferenceType.ACTION, subStrings[0], reference, false, false, null);
+                EntityDependencyNode actionEntityDependencyNode =
+                        new EntityDependencyNode(EntityReferenceType.ACTION, subStrings[0], reference, false, null);
                 dependencyNodes.add(actionEntityDependencyNode);
             }
         } else if (subStrings.length > 2) {
             if ("data".equals(subStrings[1])) {
                 // This means it is a valid API/query reference
                 // For queries and APIs, the first word is the action name
-                EntityDependencyNode actionEntityDependencyNode = new EntityDependencyNode(
-                        EntityReferenceType.ACTION, subStrings[0], reference, false, false, null);
+                EntityDependencyNode actionEntityDependencyNode =
+                        new EntityDependencyNode(EntityReferenceType.ACTION, subStrings[0], reference, false, null);
                 dependencyNodes.add(actionEntityDependencyNode);
             }
             if ("data".equals(subStrings[2])) {
@@ -469,12 +469,7 @@ public class MustacheHelper {
                 // We don't know if this is a run for sync or async JS action at this point,
                 // since both would be valid
                 EntityDependencyNode entityDependencyNode = new EntityDependencyNode(
-                        EntityReferenceType.JSACTION,
-                        subStrings[0] + "." + subStrings[1],
-                        reference,
-                        null,
-                        false,
-                        null);
+                        EntityReferenceType.JSACTION, subStrings[0] + "." + subStrings[1], reference, null, null);
                 dependencyNodes.add(entityDependencyNode);
             }
         }

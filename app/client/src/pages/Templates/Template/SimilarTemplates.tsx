@@ -41,15 +41,15 @@ export const SimilarTemplatesTitleWrapper = styled.div`
 //   ${(props) => props.width && `width: ${props.width};`}
 // `;
 
-type SimilarTemplatesProp = {
+interface SimilarTemplatesProp {
   similarTemplates: TemplateInterface[];
-  onBackPress: () => void;
+  onBackPress: (e: React.MouseEvent) => void;
   breakpointCols: MasonryProps["breakpointCols"];
   onClick: (template: TemplateInterface) => void;
   onFork?: (template: TemplateInterface) => void;
   className?: string;
   isForkingEnabled: boolean;
-};
+}
 
 function SimilarTemplates(props: SimilarTemplatesProp) {
   if (!props.similarTemplates.length) {
@@ -74,7 +74,7 @@ function SimilarTemplates(props: SimilarTemplatesProp) {
         >
           {props.similarTemplates.map((template) => (
             <Template
-              isForkingEnabled={props.isForkingEnabled}
+              hideForkTemplateButton={props.isForkingEnabled}
               key={template.id}
               onClick={() => props.onClick(template)}
               onForkTemplateClick={props.onFork}

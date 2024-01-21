@@ -2,7 +2,7 @@ import React from "react";
 import styled from "styled-components";
 import type { JSCollection } from "entities/JSCollection";
 import type { SelectProps } from "design-system";
-import { Button, Option, Select, Tooltip, Text, Tag } from "design-system";
+import { Button, Option, Select, Tooltip, Text } from "design-system";
 import {
   createMessage,
   NO_JS_FUNCTION_TO_RUN,
@@ -10,7 +10,7 @@ import {
 import type { JSActionDropdownOption } from "./utils";
 import { RUN_BUTTON_DEFAULTS, testLocators } from "./constants";
 
-type Props = {
+interface Props {
   disabled: boolean;
   isLoading: boolean;
   jsCollection: JSCollection;
@@ -19,11 +19,11 @@ type Props = {
   options: JSActionDropdownOption[];
   selected: JSActionDropdownOption;
   showTooltip: boolean;
-};
+}
 
-export type DropdownWithCTAWrapperProps = {
+export interface DropdownWithCTAWrapperProps {
   isDisabled: boolean;
-};
+}
 
 const DropdownWithCTAWrapper = styled.div<DropdownWithCTAWrapperProps>`
   display: flex;
@@ -93,7 +93,6 @@ export function JSFunctionRun({
                   <OptionLabel renderAs="p">{option.label}</OptionLabel>
                 </OptionLabelWrapper>
               </Tooltip>
-              {option.hasCustomBadge && <Tag isClosable={false}>{"Async"}</Tag>}
             </OptionWrapper>
           </Option>
         ))}

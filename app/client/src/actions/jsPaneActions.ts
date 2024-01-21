@@ -4,9 +4,9 @@ import type { JSCollection, JSAction } from "entities/JSCollection";
 import type {
   RefactorAction,
   SetFunctionPropertyPayload,
-} from "api/JSActionAPI";
-import type { EventLocation } from "utils/AnalyticsUtil";
-import type { JSEditorTab } from "../reducers/uiReducers/jsPaneReducer";
+} from "@appsmith/api/JSActionAPI";
+import type { EventLocation } from "@appsmith/utils/analyticsUtilTypes";
+import type { JSEditorTab } from "reducers/uiReducers/jsPaneReducer";
 
 export const createNewJSCollection = (
   pageId: string,
@@ -60,9 +60,8 @@ export const refactorJSCollectionAction = (payload: {
 };
 
 export const executeJSFunctionInit = (payload: {
-  collectionName: string;
+  collection: JSCollection;
   action: JSAction;
-  collectionId: string;
 }) => {
   return {
     type: ReduxActionTypes.EXECUTE_JS_FUNCTION_INIT,
@@ -71,10 +70,10 @@ export const executeJSFunctionInit = (payload: {
 };
 
 export const startExecutingJSFunction = (payload: {
-  collectionName: string;
   action: JSAction;
-  collectionId: string;
+  collection: JSCollection;
   from: EventLocation;
+  openDebugger?: boolean;
 }) => {
   return {
     type: ReduxActionTypes.START_EXECUTE_JS_FUNCTION,

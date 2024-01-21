@@ -3,18 +3,17 @@ import type {
   FlattenedWidgetProps,
 } from "reducers/entityReducers/canvasWidgetsReducer";
 import type {
-  ConfigTree,
-  DataTree,
   WidgetEntity,
   WidgetEntityConfig,
-} from "entities/DataTree/dataTreeFactory";
+} from "@appsmith/entities/DataTree/types";
+import type { ConfigTree, DataTree } from "entities/DataTree/dataTreeTypes";
 import { ENTITY_TYPE } from "entities/DataTree/dataTreeFactory";
 import { pick } from "lodash";
 import {
   WIDGET_DSL_STRUCTURE_PROPS,
   WIDGET_STATIC_PROPS,
 } from "constants/WidgetConstants";
-import WidgetFactory from "./WidgetFactory";
+import WidgetFactory from "../WidgetProvider/factory";
 import type { WidgetProps } from "widgets/BaseWidget";
 import type { LoadingEntitiesState } from "reducers/evaluationReducers/loadingEntitiesReducer";
 import type { MetaWidgetsReduxState } from "reducers/entityReducers/metaWidgetsReducer";
@@ -65,19 +64,24 @@ function widgetErrorsFromStaticProps(props: Record<string, unknown>) {
     string,
     DataTreeError[]
   >;
-  const evaluationErrors: DataTreeError[] =
-    Object.values(evaluationErrorMap).flat();
   const widgetErrors: WidgetError[] = [];
-  for (const evalError of evaluationErrors) {
-    const widgetError: WidgetError = {
-      name: evalError.errorMessage.name,
-      message: evalError.errorMessage.message,
-      stack: evalError.raw,
-      type: "property",
-    };
 
-    widgetErrors.push(widgetError);
-  }
+  Object.keys(evaluationErrorMap).forEach((propertyPath) => {
+    const propertyErrors = evaluationErrorMap[propertyPath];
+
+    propertyErrors.forEach((evalError) => {
+      const widgetError: WidgetError = {
+        name: evalError.errorMessage.name,
+        message: evalError.errorMessage.message,
+        stack: evalError.raw,
+        type: "property",
+        path: propertyPath,
+      };
+
+      widgetErrors.push(widgetError);
+    });
+  });
+
   return widgetErrors;
 }
 
@@ -91,7 +95,12 @@ export const createLoadingWidget = (
   ) as WidgetProps;
   return {
     ...widgetStaticProps,
-    type: WidgetTypes.SKELETON_WIDGET,
+    type:
+      // We don't need to set skeleton type for modals
+      // since modals are not displayed when the app is loaded
+      canvasWidget?.type !== "MODAL_WIDGET"
+        ? WidgetTypes.SKELETON_WIDGET
+        : canvasWidget?.type,
     ENTITY_TYPE: ENTITY_TYPE.WIDGET,
     bindingPaths: {},
     reactivePaths: {},
@@ -172,25 +181,6 @@ export function buildChildWidgetTree(
   }
 
   return [];
-}
-
-export function buildFlattenedChildCanvasWidgets(
-  canvasWidgets: CanvasWidgetsReduxState,
-  parentWidgetId: string,
-  flattenedChildCanvasWidgets: Record<string, FlattenedWidgetProps> = {},
-) {
-  const parentWidget = canvasWidgets[parentWidgetId];
-  parentWidget?.children?.forEach((childId) => {
-    flattenedChildCanvasWidgets[childId] = canvasWidgets[childId];
-
-    buildFlattenedChildCanvasWidgets(
-      canvasWidgets,
-      childId,
-      flattenedChildCanvasWidgets,
-    );
-  });
-
-  return flattenedChildCanvasWidgets;
 }
 
 function getWidgetSpecificChildProps(type: string) {

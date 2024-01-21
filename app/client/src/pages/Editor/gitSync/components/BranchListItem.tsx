@@ -8,12 +8,26 @@ import { Tooltip, Text, Spinner } from "design-system";
 import { isEllipsisActive } from "utils/helpers";
 import { useSelector } from "react-redux";
 import { getBranchSwitchingDetails } from "selectors/gitSyncSelectors";
+import styled from "styled-components";
+import { importRemixIcon } from "design-system-old";
+
+const ProtectedIcon = importRemixIcon(
+  async () => import("remixicon-react/ShieldKeyholeLineIcon"),
+);
+
+const OptionsContainer = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+`;
 
 export function BranchListItem({
   active,
   branch,
   className,
   isDefault,
+  isProtected,
   onClick,
   selected,
   shouldScrollIntoView,
@@ -45,6 +59,11 @@ export function BranchListItem({
       ref={itemRef}
       selected={selected}
     >
+      {isProtected && (
+        <ProtectedIcon
+          style={{ marginRight: 8, width: 14, height: 14, marginTop: 1 }}
+        />
+      )}
       <Tooltip
         content={branch}
         isDisabled={!isEllipsisActive(document.getElementById(branch))}
@@ -64,18 +83,20 @@ export function BranchListItem({
             {branch}
           </Text>
           {isDefault && <DefaultTag />}
-          {switchingToBranch === branch && isSwitchingBranch && (
-            <Spinner size="md" />
-          )}
         </span>
       </Tooltip>
-      {(hover || isMoreMenuOpen) && (
-        <BranchMoreMenu
-          branchName={branch}
-          open={isMoreMenuOpen}
-          setOpen={setIsMoreMenuOpen}
-        />
-      )}
+      <OptionsContainer>
+        {switchingToBranch === branch && isSwitchingBranch && (
+          <Spinner size="md" />
+        )}
+        {(hover || isMoreMenuOpen) && (
+          <BranchMoreMenu
+            branchName={branch}
+            open={isMoreMenuOpen}
+            setOpen={setIsMoreMenuOpen}
+          />
+        )}
+      </OptionsContainer>
     </BranchListItemContainer>
   );
 }

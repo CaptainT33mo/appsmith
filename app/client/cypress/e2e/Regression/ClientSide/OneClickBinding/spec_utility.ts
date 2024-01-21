@@ -1,4 +1,7 @@
-import { agHelper } from "../../../../support/Objects/ObjectsCore";
+import {
+  agHelper,
+  assertHelper,
+} from "../../../../support/Objects/ObjectsCore";
 import oneClickBindingLocator from "../../../../locators/OneClickBindingLocator";
 
 export class OneClickBinding {
@@ -6,7 +9,7 @@ export class OneClickBinding {
     source?: string,
     selectedSource?: any,
     table?: string,
-    column?: string,
+    column: Record<string, string> = {},
   ) {
     agHelper.GetNClick(oneClickBindingLocator.datasourceDropdownSelector);
 
@@ -16,11 +19,7 @@ export class OneClickBinding {
 
     agHelper.GetNClick(oneClickBindingLocator.datasourceSelector(source));
 
-    cy.wait("@getDatasourceStructure").should(
-      "have.nested.property",
-      "response.body.responseMeta.status",
-      200,
-    );
+    assertHelper.AssertNetworkStatus("@getDatasourceStructure");
 
     agHelper.AssertElementExist(oneClickBindingLocator.connectData);
 
@@ -37,17 +36,19 @@ export class OneClickBinding {
       oneClickBindingLocator.tableOrSpreadsheetSelectedOption(table),
     );
 
-    agHelper.AssertElementExist(oneClickBindingLocator.searchableColumn);
+    Object.entries(column).forEach(([key, value]) => {
+      agHelper.AssertElementExist((oneClickBindingLocator as any)[key]);
 
-    agHelper.GetNClick(oneClickBindingLocator.searchableColumn);
+      agHelper.GetNClick((oneClickBindingLocator as any)[key]);
 
-    agHelper.GetNClick(
-      oneClickBindingLocator.searchableColumnDropdownOption(column),
-    );
+      agHelper.GetNClick(
+        oneClickBindingLocator.columnDropdownOption(key, value),
+      );
 
-    agHelper.AssertElementExist(
-      oneClickBindingLocator.searchableColumnSelectedOption(column),
-    );
+      agHelper.AssertElementExist(
+        oneClickBindingLocator.columnSelectedOption(key, value),
+      );
+    });
 
     agHelper.AssertElementExist(oneClickBindingLocator.connectData);
 
@@ -64,7 +65,7 @@ export function expandLoadMoreOptions() {
     if ($ele.find(oneClickBindingLocator.loadMore).length > 0) {
       const length = $ele.find(oneClickBindingLocator.loadMore).length;
       new Array(length).fill(" ").forEach((d, i) => {
-        agHelper.GetNClick(oneClickBindingLocator.loadMore, i);
+        agHelper.GetNClick(oneClickBindingLocator.loadMore, 0);
       });
     }
   });

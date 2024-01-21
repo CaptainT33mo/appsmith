@@ -512,7 +512,8 @@ describe("getAllPathsFromPropertyConfig", () => {
       ],
       setAdaptiveYMin: "0",
     };
-    const config = [...contentConfig, ...styleConfig];
+
+    const config = [...contentConfig(), ...styleConfig];
 
     const bindingPaths = {
       chartType: EvaluationSubstitutionType.TEMPLATE,
@@ -537,6 +538,7 @@ describe("getAllPathsFromPropertyConfig", () => {
       validationPaths: {
         "chartData.random-id.data": {
           params: {
+            default: [],
             children: {
               params: {
                 required: true,
@@ -578,6 +580,7 @@ describe("getAllPathsFromPropertyConfig", () => {
               "PIE_CHART",
               "COLUMN_CHART",
               "AREA_CHART",
+              "CUSTOM_ECHART",
               "CUSTOM_FUSION_CHART",
             ],
           },

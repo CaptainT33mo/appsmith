@@ -6,9 +6,7 @@ import {
   getCanvasWidgets,
   getPageActions,
   getSavedDatasources,
-} from "selectors/entitiesSelector";
-import { useIsWidgetActionConnectionPresent } from "pages/Editor/utils";
-import { getEvaluationInverseDependencyMap } from "selectors/dataTreeSelectors";
+} from "@appsmith/selectors/entitiesSelector";
 import { INTEGRATION_TABS } from "constants/routes";
 import {
   getApplicationLastDeployedAt,
@@ -27,6 +25,7 @@ import { ReduxActionTypes } from "@appsmith/constants/ReduxActionConstants";
 import {
   getFirstTimeUserOnboardingComplete,
   getSignpostingStepStateByStep,
+  isWidgetActionConnectionPresent,
 } from "selectors/onboardingSelectors";
 import AnalyticsUtil from "utils/AnalyticsUtil";
 import { forceOpenWidgetPanel } from "actions/widgetSidebarActions";
@@ -45,15 +44,16 @@ import {
   SIGNPOSTING_TOOLTIP,
 } from "@appsmith/constants/messages";
 import type { Datasource } from "entities/Datasource";
-import type { ActionDataState } from "reducers/entityReducers/actionsReducer";
+import type { ActionDataState } from "@appsmith/reducers/entityReducers/actionsReducer";
 import type { CanvasWidgetsReduxState } from "reducers/entityReducers/canvasWidgetsReducer";
 import { SIGNPOSTING_STEP } from "./Utils";
-import { builderURL, integrationEditorURL } from "RouteBuilder";
+import { builderURL, integrationEditorURL } from "@appsmith/RouteBuilder";
 import { DatasourceCreateEntryPoints } from "constants/Datasource";
 import classNames from "classnames";
 import lazyLottie from "utils/lazyLottie";
 import tickMarkAnimationURL from "assets/lottie/guided-tour-tick-mark.json.txt";
 import { getAppsmithConfigs } from "@appsmith/configs";
+import { DOCS_BASE_URL } from "constants/ThirdPartyConstants";
 const { intercomAppID } = getAppsmithConfigs();
 
 const StyledDivider = styled(Divider)`
@@ -105,46 +105,43 @@ const ListItem = styled.div<{ disabled: boolean; completed: boolean }>`
   .signposting-strikethrough-static {
     text-decoration: line-through;
   }
-  .signposting-strikethrough:after {
-    content: " ";
-    position: absolute;
-    top: 50%;
-    left: 0;
-    width: 0;
-    height: 1px;
-    background: black;
+  .signposting-strikethrough {
+    background-image: linear-gradient(black, black);
+    background-repeat: no-repeat;
+    background-size: 0% 1px;
+    background-position: 0% 50%;
     animation-duration: 2s;
     animation-fill-mode: forwards;
   }
-  .signposting-strikethrough::after {
+  .signposting-strikethrough {
     -webkit-animation-name: bounceInLeft;
     animation-name: bounceInLeft;
   }
-  .signposting-strikethrough-bold::after {
+  .signposting-strikethrough-bold {
     -webkit-animation-name: signposting-strikethrough-bold;
     animation-name: signposting-strikethrough-bold;
   }
-  .signposting-strikethrough-normal::after {
+  .signposting-strikethrough-normal {
     -webkit-animation-name: signposting-strikethrough-normal;
     animation-name: signposting-strikethrough-normal;
   }
   @keyframes signposting-strikethrough-bold {
     0% {
-      width: 0;
+      background-size: 0% 1px;
     }
     50% {
-      width: 100%;
+      background-size: 100% 1px;
     }
     100% {
-      width: 100%;
+      background-size: 100% 1px;
     }
   }
   @keyframes signposting-strikethrough-normal {
     30% {
-      width: 0;
+      background-size: 0% 1px;
     }
     100% {
-      width: 100%;
+      background-size: 100% 1px;
     }
   }
 `;
@@ -275,7 +272,7 @@ function CheckListItem(props: {
           ) : (
             <PrefixCircle disabled={props.disabled} />
           )}
-          <div>
+          <div className="pr-3">
             <Text
               className={classNames({
                 "signposting-strikethrough-bold":
@@ -332,10 +329,7 @@ function CheckListItem(props: {
                 AnalyticsUtil.logEvent("SIGNPOSTING_INFO_CLICK", {
                   step: props.step,
                 });
-                window.open(
-                  props.docLink ?? "https://docs.appsmith.com/",
-                  "_blank",
-                );
+                window.open(props.docLink ?? DOCS_BASE_URL, "_blank");
                 e.stopPropagation();
               }}
               startIcon="book-line"
@@ -354,12 +348,7 @@ export default function OnboardingChecklist() {
   const pageId = useSelector(getCurrentPageId);
   const actions = useSelector(getPageActions(pageId));
   const widgets = useSelector(getCanvasWidgets);
-  const deps = useSelector(getEvaluationInverseDependencyMap);
-  const isConnectionPresent = useIsWidgetActionConnectionPresent(
-    widgets,
-    actions,
-    deps,
-  );
+  const isConnectionPresent = useSelector(isWidgetActionConnectionPresent);
   const applicationId = useSelector(getCurrentApplicationId);
   const isDeployed = !!useSelector(getApplicationLastDeployedAt);
   const { completedTasks } = getSuggestedNextActionAndCompletedTasks(
@@ -372,6 +361,7 @@ export default function OnboardingChecklist() {
   const isFirstTimeUserOnboardingComplete = useSelector(
     getFirstTimeUserOnboardingComplete,
   );
+
   const onconnectYourWidget = () => {
     const action = actions[0];
     dispatch(showSignpostingModal(false));
@@ -477,7 +467,7 @@ export default function OnboardingChecklist() {
           >
             {completedTasks} of 5{" "}
           </Text>
-          <Text>complete</Text>
+          <Text>steps complete</Text>
         </div>
         <StyledDivider className="mt-1" />
       </div>
@@ -503,6 +493,7 @@ export default function OnboardingChecklist() {
               },
             );
             dispatch(showSignpostingModal(false));
+
             history.push(
               integrationEditorURL({
                 pageId,
@@ -518,9 +509,6 @@ export default function OnboardingChecklist() {
           completed={!!actions.length}
           disabled={!datasources.length && !actions.length}
           docLink="https://docs.appsmith.com/core-concepts/data-access-and-binding/querying-a-database"
-          normalPrefixText={createMessage(
-            ONBOARDING_CHECKLIST_CREATE_A_QUERY.normalPrefix,
-          )}
           normalText={createMessage(ONBOARDING_CHECKLIST_CREATE_A_QUERY.normal)}
           onClick={() => {
             AnalyticsUtil.logEvent("SIGNPOSTING_MODAL_CREATE_QUERY_CLICK", {

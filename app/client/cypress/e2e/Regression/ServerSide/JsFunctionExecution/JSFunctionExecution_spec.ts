@@ -10,49 +10,60 @@ import {
   debuggerHelper,
   entityItems,
 } from "../../../../support/Objects/ObjectsCore";
+import EditorNavigation, {
+  EntityType,
+} from "../../../../support/Pages/EditorNavigation";
+import PageList from "../../../../support/Pages/PageList";
+
+interface IFunctionSettingData {
+  name: string;
+  onPageLoad: boolean;
+  confirmBeforeExecute: boolean;
+  // uses the "async" keyword
+  isMarkedAsync: boolean;
+}
 
 let onPageLoadAndConfirmExecuteFunctionsLength: number,
-  getJSObject: any,
+  getJSObject: (data: IFunctionSettingData[]) => string,
   functionsLength: number,
   jsObj: string;
 
-describe("JS Function Execution", function () {
-  interface IFunctionSettingData {
-    name: string;
-    onPageLoad: boolean;
-    confirmBeforeExecute: boolean;
-  }
+describe("JS Function Execution", { tags: ["@tag.JS"] }, function () {
   const FUNCTIONS_SETTINGS_DEFAULT_DATA: IFunctionSettingData[] = [
     {
       name: "getId",
       onPageLoad: true,
       confirmBeforeExecute: false,
+      isMarkedAsync: true,
     },
     {
       name: "zip",
       onPageLoad: true,
       confirmBeforeExecute: true,
+      isMarkedAsync: false,
     },
     {
       name: "base",
       onPageLoad: false,
       confirmBeforeExecute: false,
+      isMarkedAsync: true,
     },
     {
       name: "assert",
       onPageLoad: false,
       confirmBeforeExecute: false,
+      isMarkedAsync: false,
     },
     {
       name: "test",
       onPageLoad: true,
       confirmBeforeExecute: true,
+      isMarkedAsync: true,
     },
   ];
 
   before(() => {
     agHelper.AddDsl("tablev1NewDsl");
-    entityExplorer.NavigateToSwitcher("Explorer");
   });
 
   function assertAsyncFunctionsOrder(data: IFunctionSettingData[]) {
@@ -61,7 +72,7 @@ describe("JS Function Execution", function () {
       data.sort((a, b) => a.name.localeCompare(b.name));
     cy.get(jsEditor._asyncJSFunctionSettings).then(function ($lis) {
       const asyncFunctionLength = $lis.length;
-      // Assert number of async functions
+      // Assert number of functions
       expect(asyncFunctionLength).to.equal(functionsLength);
       Object.values(sortFunctions(data)).forEach((functionSetting, idx) => {
         // Assert alphabetical order
@@ -249,7 +260,7 @@ describe("JS Function Execution", function () {
     });
 
     cy.get("@jsObjName").then((jsObjName) => {
-      entityExplorer.SelectEntityByName("Table1", "Widgets");
+      EditorNavigation.SelectEntityByName("Table1", EntityType.Widget);
       propPane.UpdatePropertyFieldValue(
         "Table data",
         `{{${jsObjName}.largeData}}`,
@@ -263,7 +274,7 @@ describe("JS Function Execution", function () {
       expect($cellData).to.eq("1"); //validating id column value - row 0
       deployMode.NavigateBacktoEditor();
     });
-    entityExplorer.SelectEntityByName("JSObject1", "Queries/JS");
+    EditorNavigation.SelectEntityByName("JSObject1", EntityType.JSObject);
     entityExplorer.ActionContextMenuByEntityName({
       entityNameinLeftSidebar: "JSObject1",
       action: "Delete",
@@ -325,7 +336,7 @@ describe("JS Function Execution", function () {
       shouldCreateNewJSObj: true,
       prettify: false,
     });
-    // change async function name and test that cyclic dependency is not created
+    // change function name and test that cyclic dependency is not created
     jsEditor.EditJSObj(asyncJSCodeWithRenamedFunction1, false);
     agHelper.AssertContains("Cyclic dependency", "not.exist");
     jsEditor.EditJSObj(asyncJSCodeWithRenamedFunction2, false);
@@ -336,7 +347,7 @@ describe("JS Function Execution", function () {
     });
   });
 
-  it("7. Maintains order of async functions in settings tab alphabetically at all times", function () {
+  it("7. Maintains order of functions in settings tab alphabetically at all times", function () {
     functionsLength = FUNCTIONS_SETTINGS_DEFAULT_DATA.length;
     // Number of functions set to run on page load and should also confirm before execute
     onPageLoadAndConfirmExecuteFunctionsLength =
@@ -348,16 +359,23 @@ describe("JS Function Execution", function () {
       let JS_OBJECT_BODY = `export default`;
       for (let i = 0; i < functionsLength; i++) {
         const functionName = data[i].name;
+        const isMarkedAsync = data[i].isMarkedAsync;
         JS_OBJECT_BODY +=
           i === 0
             ? `{
-              ${functionName}: async ()=>"${functionName}",`
+              ${functionName}: ${
+                isMarkedAsync ? "async" : ""
+              } ()=>"${functionName}",`
             : i === functionsLength - 1
             ? `
-            ${functionName}: async ()=>"${functionName}",
+            ${functionName}: ${
+              isMarkedAsync ? "async" : ""
+            } ()=>"${functionName}",
           }`
             : `
-            ${functionName}: async ()=> "${functionName}",`;
+            ${functionName}: ${
+              isMarkedAsync ? "async" : ""
+            } ()=> "${functionName}",`;
       }
       return JS_OBJECT_BODY;
     };
@@ -392,6 +410,7 @@ describe("JS Function Execution", function () {
     assertAsyncFunctionsOrder(FUNCTIONS_SETTINGS_DEFAULT_DATA);
 
     agHelper.RefreshPage();
+    agHelper.Sleep(2000); //for confirmatiom modal to appear before clicking on "Yes" button for CI runs
     // click "Yes" button for all onPageload && ConfirmExecute functions
     for (let i = 0; i <= onPageLoadAndConfirmExecuteFunctionsLength - 1; i++) {
       //agHelper.AssertElementPresence(jsEditor._dialog("Confirmation Dialog")); // Not working in edit mode
@@ -409,31 +428,36 @@ describe("JS Function Execution", function () {
         name: "newGetId",
         onPageLoad: true,
         confirmBeforeExecute: false,
+        isMarkedAsync: false,
       },
       {
         name: "zip1",
         onPageLoad: true,
         confirmBeforeExecute: true,
+        isMarkedAsync: true,
       },
       {
         name: "base",
         onPageLoad: false,
         confirmBeforeExecute: false,
+        isMarkedAsync: true,
       },
       {
         name: "newAssert",
         onPageLoad: true,
         confirmBeforeExecute: false,
+        isMarkedAsync: false,
       },
       {
         name: "test",
         onPageLoad: true,
         confirmBeforeExecute: true,
+        isMarkedAsync: true,
       },
     ];
 
     // clone page and assert order of functions
-    entityExplorer.ClonePage();
+    PageList.ClonePage();
     agHelper.Sleep();
     agHelper.WaitUntilAllToastsDisappear();
     agHelper.Sleep();
@@ -443,8 +467,7 @@ describe("JS Function Execution", function () {
       jsEditor.ConfirmationClick("Yes");
       agHelper.Sleep(2000); //for current pop up to close & next to appear!
     }
-    entityExplorer.ExpandCollapseEntity("Queries/JS");
-    entityExplorer.SelectEntityByName(jsObj, "Queries/JS");
+    EditorNavigation.SelectEntityByName(jsObj, EntityType.JSObject);
     agHelper.GetNClick(jsEditor._settingsTab);
     assertAsyncFunctionsOrder(FUNCTIONS_SETTINGS_DEFAULT_DATA);
 
@@ -460,7 +483,7 @@ describe("JS Function Execution", function () {
     });
   });
 
-  it("9. Bug 13197: Verify converting async functions to sync resets all settings", () => {
+  it("9. Bug 13197: Verify converting async functions to sync doesn't reset all settings", () => {
     const asyncJSCode = `export default {
 name: "Appsmith",
 asyncToSync : async ()=>{
@@ -484,16 +507,12 @@ return "yes";`;
     // Switch to settings tab
     agHelper.GetNClick(jsEditor._settingsTab);
     // Enable all settings
-    jsEditor.EnableDisableAsyncFuncSettings("asyncToSync", true, true);
+    jsEditor.EnableDisableAsyncFuncSettings("asyncToSync", true, false);
 
     // Modify js object
     jsEditor.EditJSObj(syncJSCode, false);
-
     agHelper.RefreshPage();
-    cy.wait("@jsCollections").then(({ response }) => {
-      expect(response?.body.data.actions[0].executeOnLoad).to.eq(false);
-      expect(response?.body.data.actions[0].confirmBeforeExecute).to.eq(false);
-    });
+    jsEditor.VerifyAsyncFuncSettings("asyncToSync", true, false);
     agHelper.ActionContextMenuWithInPane({
       action: "Delete",
       entityType: entityItems.JSObject,
@@ -533,10 +552,7 @@ return "yes";`;
     // Assert that response tab is not empty
     agHelper.AssertContains("No signs of trouble here!", "not.exist");
     // Assert presence of typeError in response tab
-    agHelper.AssertContains(
-      "Cannot read properties of undefined (reading 'id')",
-      "exist",
-    );
+    agHelper.AssertContains('"Table1.unknown" is undefined', "exist");
     agHelper.AssertContains("TypeError", "exist");
 
     // click the error tab
@@ -544,10 +560,7 @@ return "yes";`;
     // Assert that errors tab is not empty
     agHelper.AssertContains("No signs of trouble here!", "not.exist");
     // Assert presence of typeError in error tab
-    agHelper.AssertContains(
-      "Cannot read properties of undefined (reading 'id')",
-      "exist",
-    );
+    agHelper.AssertContains('"Table1.unknown" is undefined', "exist");
     agHelper.AssertContains("TypeError", "exist");
 
     // Fix parse error and assert that debugger error is removed
@@ -557,10 +570,7 @@ return "yes";`;
     //agHelper.AssertContains("ran successfully"); //commenting since 'Resource not found' comes sometimes due to fast parsing
     agHelper.AssertElementAbsence(locators._btnSpinner, 10000);
     agHelper.GetNClick(locators._errorTab);
-    agHelper.AssertContains(
-      "Cannot read properties of undefined (reading 'id')",
-      "not.exist",
-    );
+    agHelper.AssertContains('"Table1.unknown" is undefined', "not.exist");
 
     // Switch back to response tab
     agHelper.GetNClick(locators._responseTab);
@@ -574,10 +584,7 @@ return "yes";`;
     jsEditor.EditJSObj(JS_OBJECT_WITH_DELETED_FUNCTION, true, false);
     // Assert that parse error is removed from debugger when function is deleted
     agHelper.GetNClick(locators._errorTab);
-    agHelper.AssertContains(
-      "Cannot read properties of undefined (reading 'id')",
-      "not.exist",
-    );
+    agHelper.AssertContains('"Table1.unknown" is undefined.', "not.exist");
     agHelper.ActionContextMenuWithInPane({
       action: "Delete",
       entityType: entityItems.JSObject,

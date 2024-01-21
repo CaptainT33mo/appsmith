@@ -2,16 +2,13 @@ import { all, call, put, spawn, take } from "redux-saga/effects";
 import { ReduxActionTypes } from "@appsmith/constants/ReduxActionConstants";
 import { MAIN_THREAD_ACTION } from "@appsmith/workers/Evaluation/evalWorkerActions";
 import log from "loglevel";
-import {
-  evalErrorHandler,
-  logJSVarMutationEvent,
-} from "../sagas/PostEvaluationSagas";
+import { logJSVarMutationEvent } from "../sagas/PostEvaluationSagas";
 import type { Channel } from "redux-saga";
 import { storeLogs } from "../sagas/DebuggerSagas";
 import type {
   BatchedJSExecutionData,
   BatchedJSExecutionErrors,
-} from "reducers/entityReducers/jsActionsReducer";
+} from "@appsmith/reducers/entityReducers/jsActionsReducer";
 import type { TMessage } from "utils/MessageUtil";
 import { MessageType } from "utils/MessageUtil";
 import type { ResponsePayload } from "../sagas/EvaluationsSaga";
@@ -27,14 +24,14 @@ import type {
   JSVarMutatedEvents,
 } from "workers/Evaluation/types";
 import isEmpty from "lodash/isEmpty";
-import type { UnEvalTree } from "entities/DataTree/dataTreeFactory";
+import type { UnEvalTree } from "entities/DataTree/dataTreeTypes";
 import { sortJSExecutionDataByCollectionId } from "workers/Evaluation/JSObject/utils";
 import type { LintTreeSagaRequestData } from "plugins/Linting/types";
-import AnalyticsUtil from "utils/AnalyticsUtil";
-export type UpdateDataTreeMessageData = {
+import { evalErrorHandler } from "./EvalErrorHandler";
+export interface UpdateDataTreeMessageData {
   workerResponse: EvalTreeResponseData;
   unevalTree: UnEvalTree;
-};
+}
 
 export function* handleEvalWorkerRequestSaga(listenerChannel: Channel<any>) {
   while (true) {
@@ -106,19 +103,6 @@ export function* processTriggerHandler(message: any) {
   if (messageType === MessageType.REQUEST)
     yield call(evalWorker.respond, message.messageId, result);
 }
-export function* handleJSExecutionLog(data: TMessage<{ data: string[] }>) {
-  const {
-    body: { data: executedFns },
-  } = data;
-
-  for (const executedFn of executedFns) {
-    AnalyticsUtil.logEvent("EXECUTE_ACTION", {
-      type: "JS",
-      name: executedFn,
-    });
-  }
-  yield call(logJSFunctionExecution, data);
-}
 
 export function* handleEvalWorkerMessage(message: TMessage<any>) {
   const { body } = message;
@@ -145,7 +129,7 @@ export function* handleEvalWorkerMessage(message: TMessage<any>) {
       break;
     }
     case MAIN_THREAD_ACTION.LOG_JS_FUNCTION_EXECUTION: {
-      yield call(handleJSExecutionLog, message);
+      yield call(logJSFunctionExecution, message);
       break;
     }
     case MAIN_THREAD_ACTION.PROCESS_BATCHED_TRIGGERS: {

@@ -154,6 +154,9 @@ const ActionCreator = React.forwardRef(
             actionType: getActionTypeLabel(actionType),
             code: newValueWithoutMoustache,
             callback: null,
+            widgetName: props.widgetName,
+            propertyName: props.propertyName,
+            widgetType: props.widgetType,
           });
         } else {
           const prevRootCallExpression = getCallExpressions(
@@ -173,6 +176,9 @@ const ActionCreator = React.forwardRef(
               actionType: getActionTypeLabel(actionType),
               code: newValueWithoutMoustache,
               callback: null,
+              widgetName: props.widgetName,
+              propertyName: props.propertyName,
+              widgetType: props.widgetType,
             });
           }
         }
@@ -187,6 +193,9 @@ const ActionCreator = React.forwardRef(
           actionType: getActionTypeLabel(actionType),
           code: newActions[id],
           callback: null,
+          widgetName: props.widgetName,
+          propertyName: props.propertyName,
+          widgetType: props.widgetType,
         });
         delete newActions[id];
         !actions[id] && setActions(newActions);
@@ -223,6 +232,7 @@ const ActionCreator = React.forwardRef(
       const hasAnEmptyBlock = Object.entries(actions).find(([, action]) =>
         isEmptyBlock(action),
       );
+
       if (hasAnEmptyBlock) {
         selectBlock(hasAnEmptyBlock[0]);
         const children = ref.current?.children || [];
@@ -248,11 +258,16 @@ const ActionCreator = React.forwardRef(
         <div className="flex flex-col gap-[2px]" ref={ref}>
           {Object.entries(actions).map(([id, value], index) => (
             <Action
+              additionalAutoComplete={props.additionalAutoComplete}
               code={value}
+              dataTreePath={props.dataTreePath}
               id={id}
               index={index}
               key={id}
               onChange={handleActionChange(id)}
+              propertyName={props.propertyName}
+              widgetName={props.widgetName}
+              widgetType={props.widgetType}
             />
           ))}
         </div>
