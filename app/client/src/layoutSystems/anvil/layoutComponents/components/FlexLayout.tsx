@@ -25,9 +25,6 @@ import {
   getAnvilHighlightShown,
   getShouldHighLightCellSelector,
 } from "layoutSystems/anvil/integrations/selectors";
-import { Colors } from "constants/Colors";
-
-export const FLEX_LAYOUT_PADDING = 4;
 
 export interface FlexLayoutProps
   extends AlignSelf,
@@ -57,7 +54,7 @@ export interface FlexLayoutProps
   overflowX?: OverflowValues;
   overflowY?: OverflowValues;
   position?: PositionValues;
-  rowGap?: Responsive<SpacingDimension>;
+  gap?: Responsive<SpacingDimension>;
   padding?: Responsive<SpacingDimension>;
   width?: Responsive<SizingDimension>;
   className?: string;
@@ -75,6 +72,7 @@ export const FlexLayout = React.memo((props: FlexLayoutProps) => {
     flexBasis,
     flexGrow,
     flexShrink,
+    gap,
     height,
     isContainer,
     isDropTarget,
@@ -90,7 +88,6 @@ export const FlexLayout = React.memo((props: FlexLayoutProps) => {
     parentDropTarget,
     position,
     renderMode,
-    rowGap,
     width,
     wrap,
   } = props;
@@ -125,8 +122,8 @@ export const FlexLayout = React.memo((props: FlexLayoutProps) => {
       maxWidth: maxWidth || "none",
       minHeight: minHeight || "unset",
       minWidth: minWidth || "unset",
-      padding: padding || (isDropTarget ? `spacing-0` : "0px"),
-      rowGap: rowGap || "0px",
+      padding: padding || "spacing-0",
+      gap: gap || "spacing-3",
       width: width || "auto",
       wrap: wrap || "nowrap",
       className: className || "",
@@ -146,7 +143,7 @@ export const FlexLayout = React.memo((props: FlexLayoutProps) => {
     minHeight,
     minWidth,
     padding,
-    rowGap,
+    gap,
     width,
     wrap,
   ]);
@@ -160,7 +157,7 @@ export const FlexLayout = React.memo((props: FlexLayoutProps) => {
     return {
       position: position || "relative",
       ...(shouldHighlightCell
-        ? { background: Colors.HIGHLIGHT_FILL_CELL }
+        ? { background: "var(--anvil-cell-highlight)" }
         : {}),
     };
   }, [border, isDropTarget, position, renderMode, shouldHighlightCell]);

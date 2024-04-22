@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 
 import type { AppState } from "@appsmith/reducers";
@@ -9,9 +9,6 @@ import {
   deleteAction,
 } from "actions/pluginActionActions";
 
-import { useNewActionName } from "./helpers";
-import { inGuidedTour } from "selectors/onboardingSelectors";
-import { toggleShowDeviationDialog } from "actions/onboardingActions";
 import {
   CONTEXT_COPY,
   CONTEXT_DELETE,
@@ -42,10 +39,12 @@ interface EntityContextMenuProps {
 
 export function MoreActionsMenu(props: EntityContextMenuProps) {
   const [isMenuOpen, toggleMenuOpen] = useToggle([false, true]);
-  const nextEntityName = useNewActionName();
-  const guidedTourEnabled = useSelector(inGuidedTour);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const { isChangePermitted = false, isDeletePermitted = false } = props;
+
+  useEffect(() => {
+    if (!isMenuOpen) setConfirmDelete(false);
+  }, [isMenuOpen]);
 
   const dispatch = useDispatch();
   const copyActionToPage = useCallback(
@@ -54,10 +53,10 @@ export function MoreActionsMenu(props: EntityContextMenuProps) {
         copyActionRequest({
           id: actionId,
           destinationPageId: pageId,
-          name: nextEntityName(`${actionName}Copy`, pageId),
+          name: actionName,
         }),
       ),
-    [dispatch, nextEntityName],
+    [dispatch],
   );
   const moveActionToPage = useCallback(
     (actionId: string, actionName: string, destinationPageId: string) =>
@@ -66,21 +65,20 @@ export function MoreActionsMenu(props: EntityContextMenuProps) {
           id: actionId,
           destinationPageId,
           originalPageId: props.pageId,
-          name: nextEntityName(actionName, destinationPageId),
+          name: actionName,
         }),
       ),
-    [dispatch, nextEntityName, props.pageId],
+    [dispatch, props.pageId],
   );
   const deleteActionFromPage = useCallback(
     (actionId: string, actionName: string) => {
-      if (guidedTourEnabled) {
-        dispatch(toggleShowDeviationDialog(true));
-        return;
-      }
-
       dispatch(deleteAction({ id: actionId, name: actionName }));
+      // Reset the delete confirmation state because it can navigate to another action
+      // which will not remount this component
+      setConfirmDelete(false);
+      toggleMenuOpen(false);
     },
-    [dispatch, guidedTourEnabled],
+    [dispatch],
   );
 
   const menuPages = useSelector((state: AppState) => {

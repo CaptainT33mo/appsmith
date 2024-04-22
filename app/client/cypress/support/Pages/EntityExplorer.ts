@@ -1,4 +1,5 @@
 import { ObjectsRegistry } from "../Objects/Registry";
+import type { EntityItemsType } from "./AssertHelper";
 import { EntityItems } from "./AssertHelper";
 import EditorNavigation, {
   EntityType,
@@ -7,6 +8,7 @@ import EditorNavigation, {
   PageLeftPane,
   PagePaneSegment,
 } from "./EditorNavigation";
+import PageList from "./PageList";
 
 type templateActions =
   | "Find"
@@ -37,8 +39,7 @@ interface EntityActionParams {
     | "Export"
     | "Import";
   subAction?: string;
-  //@ts-expect-error: type mismatch
-  entityType?: EntityItems;
+  entityType?: EntityItemsType;
   toAssertAction?: boolean;
   toastToValidate?: string;
 }
@@ -63,11 +64,13 @@ export class EntityExplorer {
   _adsPopup = "div[role='menu']";
   _entityExplorerWrapper = ".t--entity-explorer-wrapper";
   _widgetTagsList =
-    "[data-testid='widget-sidebar-scrollable-wrapper'] .widget-tag-collapisble";
+    "[data-testid='t--widget-sidebar-scrollable-wrapper'] .widget-tag-collapisble";
   _widgetCards = ".t--widget-card-draggable";
   _widgetSearchInput = "#entity-explorer-search";
   _widgetCardTitle = ".t--widget-card-draggable span.ads-v2-text";
   _widgetTagSuggestedWidgets = ".widget-tag-collapisble-suggested";
+  _widgetTagBuildingBlocks = ".widget-tag-collapisble-building-blocks";
+  _widgetSeeMoreButton = "[data-testid='t--explorer-ui-entity-tag-see-more']";
 
   public ActionContextMenuByEntityName({
     action = "Delete",
@@ -79,6 +82,9 @@ export class EntityExplorer {
   }: EntityActionParams) {
     AppSidebar.navigate(AppSidebarButton.Editor);
     this.agHelper.Sleep();
+    if (entityType === EntityItems.Page) {
+      PageList.ShowList();
+    }
     cy.xpath(this._contextMenu(entityNameinLeftSidebar))
       .scrollIntoView()
       .last()
@@ -94,6 +100,9 @@ export class EntityExplorer {
         force: true,
         toastToValidate: toastToValidate,
       });
+    }
+    if (entityType === EntityItems.Page) {
+      PageList.HideList();
     }
   }
 
@@ -152,6 +161,7 @@ export class EntityExplorer {
     dropTargetId = "",
     skipWidgetSearch = false,
   ) {
+    PageLeftPane.switchToAddNew();
     if (!skipWidgetSearch) {
       this.SearchWidgetPane(widgetType);
     }
@@ -164,14 +174,20 @@ export class EntityExplorer {
       dropTargetId
         ? dropTargetId + this.locator._dropHere
         : parentWidgetType
-        ? this.locator._widgetInCanvas(parentWidgetType) +
-          " " +
-          this.locator._dropHere
-        : this.locator._dropHere,
+          ? this.locator._widgetInCanvas(parentWidgetType) +
+            " " +
+            this.locator._dropHere
+          : this.locator._dropHere,
     )
       .first()
-      .trigger("mousemove", x, y, { eventConstructor: "MouseEvent" })
-      .trigger("mousemove", x, y, { eventConstructor: "MouseEvent" });
+      .trigger("mousemove", x, y, {
+        eventConstructor: "MouseEvent",
+        scrollBehavior: false,
+      })
+      .trigger("mousemove", x, y, {
+        eventConstructor: "MouseEvent",
+        scrollBehavior: false,
+      });
     this.agHelper.Sleep(200);
     cy.get(
       parentWidgetType
@@ -181,7 +197,10 @@ export class EntityExplorer {
         : this.locator._dropHere,
     )
       .first()
-      .trigger("mouseup", x, y, { eventConstructor: "MouseEvent" });
+      .trigger("mouseup", x, y, {
+        eventConstructor: "MouseEvent",
+        scrollBehavior: false,
+      });
   }
 
   public DragDropWidgetNVerify(
@@ -195,7 +214,7 @@ export class EntityExplorer {
     AppSidebar.navigate(AppSidebarButton.Editor);
     PageLeftPane.switchSegment(PagePaneSegment.UI);
     PageLeftPane.switchToAddNew();
-    cy.focused().blur();
+
     this.DragNDropWidget(
       widgetType,
       x,
@@ -204,7 +223,7 @@ export class EntityExplorer {
       dropTargetId,
       skipWidgetSearch,
     );
-    this.agHelper.AssertAutoSave(); //settling time for widget on canvas!
+    this.agHelper.AssertAutoSave(); //allowing widget to autosave on canvas!
     if (widgetType === "modalwidget") {
       cy.get(".t--modal-widget").should("exist");
     } else {
@@ -243,12 +262,17 @@ export class EntityExplorer {
     entityName: string,
     renameVal: string,
     viaMenu = false,
+    entityType?: EntityItemsType,
   ) {
     AppSidebar.navigate(AppSidebarButton.Editor);
+    if (entityType === EntityItems.Page && !viaMenu) {
+      PageList.ShowList();
+    }
     if (viaMenu)
       this.ActionContextMenuByEntityName({
         entityNameinLeftSidebar: entityName,
         action: "Edit name",
+        entityType,
       });
     else cy.xpath(PageLeftPane.listItemSelector(entityName)).dblclick();
     cy.xpath(this.locator._entityNameEditing(entityName))
@@ -257,6 +281,10 @@ export class EntityExplorer {
       .type("{enter}")
       .wait(300);
     this.agHelper.Sleep(); //allowing time for name change to reflect in EntityExplorer
-    PageLeftPane.assertPresence(renameVal);
+    if (entityType === EntityItems.Page) {
+      PageList.assertPresence(renameVal);
+    } else {
+      PageLeftPane.assertPresence(renameVal);
+    }
   }
 }

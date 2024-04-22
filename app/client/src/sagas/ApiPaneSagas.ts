@@ -51,7 +51,7 @@ import type {
   CreateApiActionDefaultsParams,
 } from "entities/Action";
 import { PluginPackageName, PluginType } from "entities/Action";
-import { getCurrentWorkspaceId } from "@appsmith/selectors/workspaceSelectors";
+import { getCurrentWorkspaceId } from "@appsmith/selectors/selectedWorkspaceSelectors";
 import log from "loglevel";
 import PerformanceTracker, {
   PerformanceTransactionName,
@@ -67,7 +67,7 @@ import {
   queryParamsRegEx,
 } from "utils/ApiPaneUtils";
 import { updateReplayEntity } from "actions/pageActions";
-import { ENTITY_TYPE } from "entities/AppsmithConsole";
+import { ENTITY_TYPE } from "@appsmith/entities/AppsmithConsole/utils";
 import type { Plugin } from "api/PluginApi";
 import { getDisplayFormat } from "selectors/apiPaneSelectors";
 import {

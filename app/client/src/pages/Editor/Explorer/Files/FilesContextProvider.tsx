@@ -4,10 +4,10 @@ import type { ActionParentEntityTypeInterface } from "@appsmith/entities/Engine/
 export enum ActionEntityContextMenuItemsEnum {
   EDIT_NAME = "Edit Name",
   SHOW_BINDING = "Show Bindings",
+  CONVERT_QUERY_MODULE_INSTANCE = "Create Module",
   COPY = "Copy",
   MOVE = "Move",
   DELETE = "Delete",
-  CONVERT_QUERY_MODULE_INSTANCE = "Create Module",
 }
 
 export const defaultMenuItems = [
@@ -26,6 +26,7 @@ interface FilesContextContextProps {
   parentEntityId: string; // page, workflow or module
   parentEntityType: ActionParentEntityTypeInterface;
   showModules?: boolean;
+  showWorkflows?: boolean;
   selectFilesForExplorer?: (state: any) => any;
 }
 
@@ -51,6 +52,7 @@ export const FilesContextProvider = ({
   parentEntityType,
   selectFilesForExplorer,
   showModules,
+  showWorkflows,
 }: FilesContextProviderProps) => {
   const value = useMemo(() => {
     return {
@@ -61,6 +63,7 @@ export const FilesContextProvider = ({
       menuItems: menuItems || defaultMenuItems,
       selectFilesForExplorer,
       showModules,
+      showWorkflows,
     };
   }, [
     canCreateActions,
@@ -68,6 +71,7 @@ export const FilesContextProvider = ({
     parentEntityType,
     menuItems,
     showModules,
+    showWorkflows,
     selectFilesForExplorer,
     editorId,
   ]);

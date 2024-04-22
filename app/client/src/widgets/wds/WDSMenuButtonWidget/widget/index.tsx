@@ -18,7 +18,6 @@ import {
   EventType,
   type ExecuteTriggerPayload,
 } from "constants/AppsmithActionConstants/ActionConstants";
-import { Text } from "@design-system/widgets";
 
 class WDSMenuButtonWidget extends BaseWidget<
   MenuButtonWidgetProps,
@@ -42,18 +41,15 @@ class WDSMenuButtonWidget extends BaseWidget<
     return defaultsConfig;
   }
 
-  static getAutoLayoutConfig() {
-    return {};
-  }
-
   static getAnvilConfig(): AnvilConfig | null {
     return {
       isLargeWidget: false,
       widgetSize: {
-        maxHeight: {},
-        maxWidth: { base: "360px" },
-        minHeight: { base: "40px" },
-        minWidth: { base: "120px" },
+        maxWidth: {
+          base: "100%",
+          "280px": "sizing-70",
+        },
+        minWidth: "sizing-14",
       },
     };
   }
@@ -190,9 +186,7 @@ class WDSMenuButtonWidget extends BaseWidget<
 
         <MenuList>
           {visibleItems.map((menuItem: MenuItem) => (
-            <Item key={menuItem.id}>
-              <Text color={menuItem.textColor}>{menuItem.label}</Text>
-            </Item>
+            <Item key={menuItem.id}>{menuItem.label}</Item>
           ))}
         </MenuList>
       </Menu>

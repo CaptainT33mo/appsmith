@@ -8,7 +8,7 @@ import { ToggleButton, Tooltip, Button } from "design-system";
 import PropertyControlFactory from "utils/PropertyControlFactory";
 import PropertyHelpLabel from "pages/Editor/PropertyPane/PropertyHelpLabel";
 import { useDispatch, useSelector } from "react-redux";
-import AnalyticsUtil from "utils/AnalyticsUtil";
+import AnalyticsUtil from "@appsmith/utils/AnalyticsUtil";
 import type { UpdateWidgetPropertyPayload } from "actions/controlActions";
 import {
   batchUpdateMultipleWidgetProperties,
@@ -33,7 +33,7 @@ import {
 import type { EnhancementFns } from "selectors/widgetEnhancementSelectors";
 import type { EditorTheme } from "components/editorComponents/CodeEditor/EditorConfig";
 import AppsmithConsole from "utils/AppsmithConsole";
-import { ENTITY_TYPE } from "entities/AppsmithConsole";
+import { ENTITY_TYPE } from "@appsmith/entities/AppsmithConsole/utils";
 import LOG_TYPE from "entities/AppsmithConsole/logtype";
 import { getExpectedValue } from "utils/validation/common";
 import type { ControlData } from "components/propertyControls/BaseControl";
@@ -633,21 +633,36 @@ const PropertyControl = memo((props: Props) => {
     if (hasRenamingError()) {
       return;
     } else if (editedName.trim() && editedName !== props.propertyName) {
-      let update = {
+      let modify = {
         [editedName]: widgetProperties[props.propertyName],
       };
+
+      let triggerPaths: string[] = [];
 
       if (
         props.controlConfig &&
         typeof props.controlConfig.onEdit === "function"
       ) {
-        update = {
-          ...update,
-          ...props.controlConfig.onEdit(widgetProperties, editedName),
+        const updates = props.controlConfig.onEdit(
+          widgetProperties,
+          editedName,
+        );
+
+        modify = {
+          ...modify,
+          ...updates.modify,
         };
+
+        triggerPaths = updates.triggerPaths;
       }
 
-      onBatchUpdateProperties(update);
+      dispatch(
+        batchUpdateWidgetProperty(widgetProperties.widgetId, {
+          modify,
+          triggerPaths,
+        }),
+      );
+
       onDeleteProperties([props.propertyName]);
     }
     resetEditing();
@@ -657,7 +672,7 @@ const PropertyControl = memo((props: Props) => {
     });
   }, [
     props,
-    onBatchUpdateProperties,
+    batchUpdateWidgetProperty,
     onDeleteProperties,
     props.propertyName,
     editedName,
@@ -845,8 +860,8 @@ const PropertyControl = memo((props: Props) => {
     const JSToggleTooltip = isToggleDisabled
       ? JS_TOGGLE_DISABLED_MESSAGE
       : !isDynamic
-      ? JS_TOGGLE_SWITCH_JS_MESSAGE
-      : "";
+        ? JS_TOGGLE_SWITCH_JS_MESSAGE
+        : "";
 
     try {
       return (

@@ -10,11 +10,28 @@ export const setIdeEditorViewMode = (mode: EditorViewMode) => {
   };
 };
 
-export const setIdeEditorPagesActiveStatus = (active: boolean) => {
+export const restoreIDEEditorViewMode = () => {
   return {
-    type: ReduxActionTypes.SET_IDE_EDITOR_PAGES_ACTIVE_STATUS,
-    payload: {
-      pagesActive: active,
-    },
+    type: ReduxActionTypes.RESTORE_IDE_EDITOR_VIEW_MODE,
+  };
+};
+
+export const setJSTabs = (tabs: string[]) => {
+  return {
+    type: ReduxActionTypes.SET_IDE_JS_TABS,
+    payload: tabs,
+  };
+};
+
+export const setQueryTabs = (tabs: string[]) => {
+  return {
+    type: ReduxActionTypes.SET_IDE_QUERIES_TABS,
+    payload: tabs,
+  };
+};
+export const setShowQueryCreateNewModal = (payload: boolean) => {
+  return {
+    type: ReduxActionTypes.SET_SHOW_QUERY_CREATE_NEW_MODAL,
+    payload,
   };
 };

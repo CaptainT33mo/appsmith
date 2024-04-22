@@ -5,8 +5,6 @@ import styled from "styled-components";
 
 import { selectJSSegmentEditorList } from "@appsmith/selectors/appIDESelectors";
 import { useActiveAction } from "@appsmith/pages/Editor/Explorer/hooks";
-import ExplorerJSCollectionEntity from "pages/Editor/Explorer/JSActions/JSActionEntity";
-import type { PluginType } from "entities/Action";
 import {
   getCurrentApplicationId,
   getCurrentPageId,
@@ -16,10 +14,11 @@ import { useFeatureFlag } from "utils/hooks/useFeatureFlag";
 import { FEATURE_FLAG } from "@appsmith/entities/FeatureFlag";
 import { getHasCreateActionPermission } from "@appsmith/utils/BusinessFeatures/permissionPageHelpers";
 import { createMessage, EDITOR_PANE_TEXTS } from "@appsmith/constants/messages";
-import { EmptyState } from "../components/EmptyState";
 import { ActionParentEntityType } from "@appsmith/entities/Engine/actionHelpers";
 import { FilesContextProvider } from "pages/Editor/Explorer/Files/FilesContextProvider";
-import { useJSAdd } from "./hooks";
+import { useJSAdd } from "@appsmith/pages/Editor/IDE/EditorPane/JS/hooks";
+import { JSListItem } from "@appsmith/pages/Editor/IDE/EditorPane/JS/ListItem";
+import { BlankState } from "./BlankState";
 
 const JSContainer = styled(Flex)`
   & .t--entity-item {
@@ -76,10 +75,17 @@ const ListJSObjects = () => {
         parentEntityId={pageId}
         parentEntityType={ActionParentEntityType.PAGE}
       >
-        <Flex flex="1" flexDirection="column" overflowY="auto" px="spaces-3">
+        <Flex
+          data-testid="t--ide-list"
+          flex="1"
+          flexDirection="column"
+          gap="spaces-4"
+          overflowY="auto"
+          px="spaces-3"
+        >
           {jsList.map(({ group, items }) => {
             return (
-              <>
+              <Flex flexDirection={"column"} key={group}>
                 {group !== "NA" ? (
                   <Flex px="spaces-3" py="spaces-1">
                     <Text
@@ -93,38 +99,23 @@ const ListJSObjects = () => {
                 <>
                   {items.map((item) => {
                     return (
-                      <Flex flexDirection={"column"} key={item.key}>
-                        <ExplorerJSCollectionEntity
-                          id={item.key}
-                          isActive={item.key === activeActionId}
-                          key={item.key}
-                          parentEntityId={pageId}
-                          parentEntityType={ActionParentEntityType.PAGE}
-                          searchKeyword={""}
-                          step={2}
-                          type={item.type as PluginType}
-                        />
-                      </Flex>
+                      <JSListItem
+                        isActive={item.key === activeActionId}
+                        item={item}
+                        key={item.key}
+                        parentEntityId={pageId}
+                        parentEntityType={ActionParentEntityType.PAGE}
+                      />
                     );
                   })}
                 </>
-              </>
+              </Flex>
             );
           })}
         </Flex>
       </FilesContextProvider>
 
-      {(!jsList || jsList.length === 0) && (
-        <EmptyState
-          buttonClassName="t--add-item"
-          buttonText={createMessage(EDITOR_PANE_TEXTS.js_add_button)}
-          description={createMessage(
-            EDITOR_PANE_TEXTS.js_blank_state_description,
-          )}
-          icon={"js-square-v3"}
-          onClick={canCreateActions ? addButtonClickHandler : undefined}
-        />
-      )}
+      {(!jsList || jsList.length === 0) && <BlankState />}
     </JSContainer>
   );
 };

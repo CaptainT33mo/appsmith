@@ -161,6 +161,13 @@ export const importApplication = (appDetails: ImportApplicationRequest) => {
   };
 };
 
+export const openPartialImportModal = (payload: boolean) => {
+  return {
+    type: ReduxActionTypes.PARTIAL_IMPORT_MODAL_OPEN,
+    payload,
+  };
+};
+
 export const importPartialApplication = (appPartialDetails: {
   applicationFile: File;
 }) => {
@@ -185,9 +192,10 @@ export const importApplicationSuccess = (
   };
 };
 
-export const getAllApplications = () => {
+export const fetchAllApplicationsOfWorkspace = (payload?: string) => {
   return {
-    type: ReduxActionTypes.GET_ALL_APPLICATION_INIT,
+    type: ReduxActionTypes.FETCH_ALL_APPLICATIONS_OF_WORKSPACE_INIT,
+    payload,
   };
 };
 

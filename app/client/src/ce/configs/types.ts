@@ -2,6 +2,7 @@ import type { LogLevelDesc } from "loglevel";
 
 export interface AppVersionData {
   id: string;
+  sha: string;
   releaseDate: string;
   edition: string;
 }
@@ -25,6 +26,7 @@ export interface AppsmithUIConfigs {
     accountId: string;
     applicationId: string;
     browserAgentlicenseKey: string;
+    browserAgentEndpoint: string;
     otlpLicenseKey: string;
     otlpServiceName: string;
     otlpEndpoint: string;
@@ -46,7 +48,6 @@ export interface AppsmithUIConfigs {
     snippetIndex: string;
   };
 
-  enableRapidAPI: boolean;
   enableMixpanel: boolean;
 
   cloudHosting: boolean;

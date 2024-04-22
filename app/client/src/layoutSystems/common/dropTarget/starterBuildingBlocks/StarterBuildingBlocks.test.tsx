@@ -19,7 +19,7 @@ jest.mock("actions/templateActions", () => ({
   importStarterBuildingBlockIntoApplication: jest.fn(),
   showTemplatesModal: jest.fn(),
 }));
-jest.mock("utils/AnalyticsUtil", () => ({
+jest.mock("@appsmith/utils/AnalyticsUtil", () => ({
   logEvent: jest.fn(),
 }));
 
@@ -66,9 +66,8 @@ describe("<StarterBuildingBlocks />", () => {
     store = mockStore({
       ...unitTestBaseMockStore,
       ui: {
-        workspaces: {
-          currentWorkspace:
-            unitTestBaseMockStore.ui.workspaces.currentWorkspace,
+        selectedWorkspace: {
+          workspace: unitTestBaseMockStore.ui.workspaces.currentWorkspace,
         },
         applications: {
           isFetchingApplications: false,

@@ -3,7 +3,7 @@ import React, { useEffect, useRef } from "react";
 import styled from "styled-components";
 import { thinScrollbar } from "constants/DefaultTheme";
 import type { AppState } from "@appsmith/reducers";
-import { getCurrentAppWorkspace } from "@appsmith/selectors/workspaceSelectors";
+import { getCurrentAppWorkspace } from "@appsmith/selectors/selectedWorkspaceSelectors";
 import { selectFeatureFlags } from "@appsmith/selectors/featureFlagsSelectors";
 import { isGACEnabled } from "@appsmith/utils/planHelpers";
 import { getHasCreateDatasourcePermission } from "@appsmith/utils/BusinessFeatures/permissionPageHelpers";
@@ -24,10 +24,7 @@ import NewApiScreen from "./NewApi";
 import NewQueryScreen from "./NewQuery";
 import { isAirgapped } from "@appsmith/utils/airgapHelpers";
 import history from "utils/history";
-import { showDebuggerFlag } from "../../../selectors/debuggerSelectors";
-import classNames from "classnames";
-import { getIsAppSidebarEnabled } from "../../../selectors/ideSelectors";
-import { FEATURE_FLAG } from "@appsmith/entities/FeatureFlag";
+import { showDebuggerFlag } from "selectors/debuggerSelectors";
 import {
   createMessage,
   CREATE_NEW_DATASOURCE_DATABASE_HEADER,
@@ -42,6 +39,7 @@ import {
 import { useEditorType } from "@appsmith/hooks";
 import { useParentEntityInfo } from "@appsmith/hooks/datasourceEditorHooks";
 import AIDataSources from "./AIDataSources";
+import Debugger from "../DataSourceEditor/Debugger";
 
 const NewIntegrationsContainer = styled.div`
   ${thinScrollbar};
@@ -89,6 +87,7 @@ function CreateNewAPI({
   active,
   history,
   isCreating,
+  isOnboardingScreen,
   pageId,
   showUnsupportedPluginDialog,
 }: any) {
@@ -114,6 +113,7 @@ function CreateNewAPI({
       <NewApiScreen
         history={history}
         isCreating={isCreating}
+        isOnboardingScreen={isOnboardingScreen}
         location={location}
         pageId={pageId}
         showSaasAPIs={false}
@@ -127,6 +127,8 @@ function CreateNewDatasource({
   active,
   history,
   isCreating,
+  isOnboardingScreen,
+  pageId,
   showMostPopularPlugins,
   showUnsupportedPluginDialog,
 }: any) {
@@ -158,7 +160,7 @@ function CreateNewDatasource({
         history={history}
         isCreating={isCreating}
         location={location}
-        parentEntityId={parentEntityId}
+        parentEntityId={parentEntityId || (isOnboardingScreen && pageId) || ""}
         parentEntityType={parentEntityType}
         showMostPopularPlugins={showMostPopularPlugins}
         showUnsupportedPluginDialog={showUnsupportedPluginDialog}
@@ -192,17 +194,20 @@ function CreateNewSaasIntegration({
     }
   }, [active]);
   return !isAirgappedInstance ? (
-    <div id="new-saas-api" ref={newSaasAPIRef}>
-      <Text kind="heading-m">SaaS Integrations</Text>
-      <NewApiScreen
-        history={history}
-        isCreating={isCreating}
-        location={location}
-        pageId={pageId}
-        showSaasAPIs
-        showUnsupportedPluginDialog={showUnsupportedPluginDialog}
-      />
-    </div>
+    <>
+      <StyledDivider />
+      <div id="new-saas-api" ref={newSaasAPIRef}>
+        <Text kind="heading-m">SaaS integrations</Text>
+        <NewApiScreen
+          history={history}
+          isCreating={isCreating}
+          location={location}
+          pageId={pageId}
+          showSaasAPIs
+          showUnsupportedPluginDialog={showUnsupportedPluginDialog}
+        />
+      </div>
+    </>
   ) : null;
 }
 
@@ -215,17 +220,20 @@ function CreateNewAIIntegration({
   const isAirgappedInstance = isAirgapped();
 
   return !isAirgappedInstance ? (
-    <div id="new-ai-query">
-      <Text kind="heading-m">AI Integrations</Text>
-      <AIDataSources
-        history={history}
-        isCreating={isCreating}
-        location={location}
-        pageId={pageId}
-        showSaasAPIs
-        showUnsupportedPluginDialog={showUnsupportedPluginDialog}
-      />
-    </div>
+    <>
+      <StyledDivider />
+      <div id="new-ai-query">
+        <Text kind="heading-m">AI integrations</Text>
+        <AIDataSources
+          history={history}
+          isCreating={isCreating}
+          location={location}
+          pageId={pageId}
+          showSaasAPIs
+          showUnsupportedPluginDialog={showUnsupportedPluginDialog}
+        />
+      </div>
+    </>
   ) : null;
 }
 
@@ -237,8 +245,7 @@ interface CreateNewDatasourceScreenProps {
   canCreateDatasource?: boolean;
   showDebugger: boolean;
   pageId: string;
-  isAppSidebarEnabled: boolean;
-  isEnabledForCreateNew: boolean;
+  isOnboardingScreen?: boolean;
 }
 
 interface CreateNewDatasourceScreenState {
@@ -268,10 +275,10 @@ class CreateNewDatasourceTab extends React.Component<
     const {
       canCreateDatasource = false,
       dataSources,
-      isAppSidebarEnabled,
       isCreating,
-      isEnabledForCreateNew,
+      isOnboardingScreen,
       pageId,
+      showDebugger,
     } = this.props;
     if (!canCreateDatasource) return null;
     const mockDataSection =
@@ -282,73 +289,68 @@ class CreateNewDatasourceTab extends React.Component<
         />
       ) : null;
     return (
-      <NewIntegrationsContainer
-        className={classNames({
-          "p-4": isAppSidebarEnabled,
-        })}
-        id="new-integrations-wrapper"
-      >
-        {dataSources.length === 0 && <AddDatasourceSecurely />}
-        {dataSources.length === 0 && this.props.mockDatasources.length > 0 && (
-          <>
-            {mockDataSection}
-            <StyledDivider />
-          </>
-        )}
-        {isEnabledForCreateNew && (
-          <>
-            <CreateNewDatasource
-              active={false}
-              history={history}
-              isCreating={isCreating}
-              location={location}
-              pageId={pageId}
-              showMostPopularPlugins
-              showUnsupportedPluginDialog={this.showUnsupportedPluginDialog}
-            />
-            <StyledDivider />
-          </>
-        )}
-        <CreateNewAPI
-          active={false}
-          history={history}
-          isCreating={isCreating}
-          location={location}
-          pageId={pageId}
-          showUnsupportedPluginDialog={this.showUnsupportedPluginDialog}
-        />
-        <StyledDivider />
-        <CreateNewDatasource
-          active={false}
-          history={history}
-          isCreating={isCreating}
-          location={location}
-          pageId={pageId}
-          showUnsupportedPluginDialog={this.showUnsupportedPluginDialog}
-        />
-        <StyledDivider />
-        <CreateNewSaasIntegration
-          active={false}
-          history={history}
-          isCreating={isCreating}
-          location={location}
-          pageId={pageId}
-          showUnsupportedPluginDialog={this.showUnsupportedPluginDialog}
-        />
-        <StyledDivider />
-        <CreateNewAIIntegration
-          history={history}
-          isCreating={isCreating}
-          pageId={pageId}
-          showUnsupportedPluginDialog={this.showUnsupportedPluginDialog}
-        />
-        {dataSources.length > 0 && this.props.mockDatasources.length > 0 && (
-          <>
-            <StyledDivider />
-            {mockDataSection}
-          </>
-        )}
-      </NewIntegrationsContainer>
+      <>
+        <NewIntegrationsContainer className="p-4" id="new-integrations-wrapper">
+          {dataSources.length === 0 && <AddDatasourceSecurely />}
+          {dataSources.length === 0 &&
+            this.props.mockDatasources.length > 0 && (
+              <>
+                {mockDataSection}
+                <StyledDivider />
+              </>
+            )}
+          <CreateNewDatasource
+            active={false}
+            history={history}
+            isCreating={isCreating}
+            isOnboardingScreen={!!isOnboardingScreen}
+            location={location}
+            pageId={pageId}
+            showMostPopularPlugins
+            showUnsupportedPluginDialog={this.showUnsupportedPluginDialog}
+          />
+          <StyledDivider />
+          <CreateNewAPI
+            active={false}
+            history={history}
+            isCreating={isCreating}
+            isOnboardingScreen={!!isOnboardingScreen}
+            location={location}
+            pageId={pageId}
+            showUnsupportedPluginDialog={this.showUnsupportedPluginDialog}
+          />
+          <StyledDivider />
+          <CreateNewDatasource
+            active={false}
+            history={history}
+            isCreating={isCreating}
+            location={location}
+            pageId={pageId}
+            showUnsupportedPluginDialog={this.showUnsupportedPluginDialog}
+          />
+          <CreateNewSaasIntegration
+            active={false}
+            history={history}
+            isCreating={isCreating}
+            location={location}
+            pageId={pageId}
+            showUnsupportedPluginDialog={this.showUnsupportedPluginDialog}
+          />
+          <CreateNewAIIntegration
+            history={history}
+            isCreating={isCreating}
+            pageId={pageId}
+            showUnsupportedPluginDialog={this.showUnsupportedPluginDialog}
+          />
+          {dataSources.length > 0 && this.props.mockDatasources.length > 0 && (
+            <>
+              <StyledDivider />
+              {mockDataSection}
+            </>
+          )}
+        </NewIntegrationsContainer>
+        {showDebugger && <Debugger />}
+      </>
     );
   }
 }
@@ -374,9 +376,6 @@ const mapStateToProps = (state: AppState) => {
     userWorkspacePermissions,
   );
 
-  const isEnabledForCreateNew =
-    !!featureFlags[FEATURE_FLAG.ab_create_new_apps_enabled];
-  const isAppSidebarEnabled = getIsAppSidebarEnabled(state);
   return {
     dataSources: getDatasources(state),
     mockDatasources: getMockDatasources(state),
@@ -385,8 +384,6 @@ const mapStateToProps = (state: AppState) => {
     canCreateDatasource,
     showDebugger,
     pageId,
-    isAppSidebarEnabled,
-    isEnabledForCreateNew,
   };
 };
 

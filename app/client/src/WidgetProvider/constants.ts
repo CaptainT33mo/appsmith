@@ -2,6 +2,8 @@
  * TODO: (Balaji) Move all the types to different file
  */
 import { IconNames } from "@blueprintjs/icons";
+import type { SpacingDimension } from "@design-system/widgets";
+import type { Responsive, SizingDimension } from "@design-system/widgets";
 import type { Theme } from "constants/DefaultTheme";
 import type { PropertyPaneConfig } from "constants/PropertyControlConstants";
 import type { WidgetTags } from "constants/WidgetConstants";
@@ -56,10 +58,12 @@ export interface AutoLayoutConfig {
   disabledPropsDefaults?: Partial<WidgetProps>;
 }
 export interface SizeConfig {
-  maxHeight?: Record<string, string>;
-  maxWidth?: Record<string, string>;
-  minHeight: Record<string, string>;
-  minWidth: Record<string, string>;
+  maxHeight?: Responsive<SizingDimension>;
+  maxWidth?: Responsive<SizingDimension>;
+  minHeight?: Responsive<SizingDimension>;
+  minWidth?: Responsive<SizingDimension>;
+  paddingTop?: Responsive<SpacingDimension>;
+  paddingBottom?: Responsive<SpacingDimension>;
 }
 
 export interface AnvilConfig {
@@ -73,6 +77,7 @@ export interface AnvilConfig {
 export interface WidgetBaseConfiguration {
   name: string;
   iconSVG?: string;
+  thumbnailSVG?: string;
   hideCard?: boolean;
   eagerRender?: boolean;
   isDeprecated?: boolean;
@@ -86,6 +91,9 @@ export interface WidgetBaseConfiguration {
   // Flag to tell platform to disaplay this widget when search key
   // is not matching any widget.
   isSearchWildcard?: boolean;
+
+  // Flag to tell withWidgetProps HOC to inject evaluation errors into the widget
+  needsErrorInfo?: boolean;
 }
 
 export type WidgetDefaultProps = Partial<WidgetProps> & WidgetConfigProps;
@@ -129,7 +137,7 @@ type GetEditorCallouts = (props: WidgetProps) => WidgetCallout[];
 
 export interface WidgetCallout {
   message: string;
-  links: [
+  links?: [
     {
       text: string;
       url: string;

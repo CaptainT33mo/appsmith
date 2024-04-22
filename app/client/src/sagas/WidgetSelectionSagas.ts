@@ -24,12 +24,12 @@ import type { CanvasWidgetsReduxState } from "reducers/entityReducers/canvasWidg
 import { all, call, put, select, take, takeLatest } from "redux-saga/effects";
 import type { SetSelectionResult } from "sagas/WidgetSelectUtils";
 import {
-  SelectionRequestType,
   assertParentId,
   getWidgetAncestry,
   isInvalidSelectionRequest,
   pushPopWidgetSelection,
   selectAllWidgetsInCanvasSaga,
+  SelectionRequestType,
   selectMultipleWidgets,
   selectOneWidget,
   shiftSelectWidgets,
@@ -41,15 +41,25 @@ import {
   getIsFetchingPage,
   snipingModeSelector,
 } from "selectors/editorSelectors";
-import { getLastSelectedWidget, getSelectedWidgets } from "selectors/ui";
+import {
+  getLastSelectedWidget,
+  getSelectedWidgets,
+  getWidgetSelectionBlock,
+} from "selectors/ui";
 import { areArraysEqual } from "utils/AppsmithUtils";
 import { quickScrollToWidget } from "utils/helpers";
 import history, { NavigationMethod } from "utils/history";
 import {
   getWidgetIdsByType,
   getWidgetImmediateChildren,
+  getWidgetMetaProps,
   getWidgets,
 } from "./selectors";
+import { getModalWidgetType } from "selectors/widgetSelectors";
+import { getWidgetSelectorByWidgetId } from "selectors/layoutSystemSelectors";
+import { getAppViewerPageIdFromPath } from "@appsmith/pages/Editor/Explorer/helpers";
+import AnalyticsUtil from "@appsmith/utils/AnalyticsUtil";
+import { getIsAnvilLayout } from "layoutSystems/anvil/integrations/selectors";
 
 // The following is computed to be used in the entity explorer
 // Every time a widget is selected, we need to expand widget entities
@@ -62,8 +72,17 @@ function* selectWidgetSaga(action: ReduxAction<WidgetSelectionRequestPayload>) {
       payload = [],
       selectionRequestType,
     } = action.payload;
+    /**
+     * Apart from the normal selection request by a user on canvas, there are other ways which can trigger selection
+     * e.g. when a modal closes in the editor -> we select the main container.
+     * One way modal closes is because user navigates to home page using the appsmith icon. In this case, we don't want the selection process to trigger.
+     * This also safeguards against the case where the selection process is triggered by a non-canvas click where user moves out of editor.
+     * */
 
-    if (payload.some(isInvalidSelectionRequest)) {
+    const isOnEditorURL = !!getAppViewerPageIdFromPath(
+      window.location.pathname,
+    );
+    if (payload.some(isInvalidSelectionRequest) || !isOnEditorURL) {
       // Throw error
       return;
     }
@@ -97,7 +116,8 @@ function* selectWidgetSaga(action: ReduxAction<WidgetSelectionRequestPayload>) {
         newSelection = payload;
         break;
       }
-      case SelectionRequestType.One: {
+      case SelectionRequestType.One:
+      case SelectionRequestType.Create: {
         assertParentId(parentId);
         newSelection = selectOneWidget(payload);
         break;
@@ -169,7 +189,13 @@ function* selectWidgetSaga(action: ReduxAction<WidgetSelectionRequestPayload>) {
       yield put(setSelectedWidgets(newSelection));
       return;
     }
-    yield call(appendSelectedWidgetToUrlSaga, newSelection, pageId, invokedBy);
+    yield call(
+      appendSelectedWidgetToUrlSaga,
+      newSelection,
+      selectionRequestType,
+      pageId,
+      invokedBy,
+    );
   } catch (error) {
     yield put({
       type: ReduxActionErrorTypes.WIDGET_SELECTION_ERROR,
@@ -184,18 +210,24 @@ function* selectWidgetSaga(action: ReduxAction<WidgetSelectionRequestPayload>) {
 /**
  * Append Selected widgetId as hash to the url path
  * @param selectedWidgets
+ * @param type
  * @param pageId
  * @param invokedBy
  */
 function* appendSelectedWidgetToUrlSaga(
   selectedWidgets: string[],
+  type: SelectionRequestType,
   pageId?: string,
   invokedBy?: NavigationMethod,
 ) {
   const isSnipingMode: boolean = yield select(snipingModeSelector);
+  const isWidgetSelectionBlocked: boolean = yield select(
+    getWidgetSelectionBlock,
+  );
   const appMode: APP_MODE = yield select(getAppMode);
   const viewMode = appMode === APP_MODE.PUBLISHED;
   if (isSnipingMode || viewMode) return;
+
   const { pathname } = window.location;
   const currentPageId: string = yield select(getCurrentPageId);
   const currentURL = pathname;
@@ -203,6 +235,7 @@ function* appendSelectedWidgetToUrlSaga(
     ? widgetURL({
         pageId: pageId ?? currentPageId,
         persistExistingParams: true,
+        add: type === SelectionRequestType.Create,
         selectedWidgets,
       })
     : widgetURL({
@@ -210,6 +243,9 @@ function* appendSelectedWidgetToUrlSaga(
         persistExistingParams: true,
         selectedWidgets: [MAIN_CONTAINER_WIDGET_ID],
       });
+  if (invokedBy === NavigationMethod.CanvasClick && isWidgetSelectionBlocked) {
+    AnalyticsUtil.logEvent("CODE_MODE_WIDGET_SELECTION");
+  }
   if (currentURL !== newUrl) {
     history.push(newUrl, { invokedBy });
   }
@@ -245,15 +281,25 @@ function* handleWidgetSelectionSaga(
 }
 
 function* openOrCloseModalSaga(action: ReduxAction<{ widgetIds: string[] }>) {
-  if (action.payload.widgetIds.length !== 1) return;
+  const widgetsToSelect = action.payload.widgetIds;
+  if (widgetsToSelect.length !== 1) return;
+  if (
+    widgetsToSelect.length === 1 &&
+    widgetsToSelect[0] === MAIN_CONTAINER_WIDGET_ID
+  ) {
+    // for cases where a widget inside modal is deleted and main canvas gets selected post that.
+    return;
+  }
 
   // Let's assume that the payload widgetId is a modal widget and we need to open the modal as it is selected
   let modalWidgetToOpen: string = action.payload.widgetIds[0];
 
+  const modalWidgetType: string = yield select(getModalWidgetType);
+
   // Get all modal widget ids
   const modalWidgetIds: string[] = yield select(
     getWidgetIdsByType,
-    "MODAL_WIDGET",
+    modalWidgetType,
   );
 
   // Get all widgets
@@ -281,9 +327,31 @@ function* openOrCloseModalSaga(action: ReduxAction<{ widgetIds: string[] }>) {
       modalWidgetToOpen = widgetAncestry[indexOfParentModalWidget];
     }
   }
+  const isAnvilLayout: boolean = yield select(getIsAnvilLayout);
+  if (isAnvilLayout) {
+    // If widget is modal and modal is already open, skip opening it
+    const modalProps = allWidgets[modalWidgetToOpen];
+    const metaProps: Record<string, unknown> = yield select(
+      getWidgetMetaProps,
+      modalProps,
+    );
+
+    if (
+      (widgetIsModal || widgetIsChildOfModal) &&
+      metaProps?.isVisible === true
+    ) {
+      return;
+    }
+  }
 
   if (widgetIsModal || widgetIsChildOfModal) {
     yield put(showModal(modalWidgetToOpen));
+  }
+  if (!widgetIsModal && !widgetIsChildOfModal) {
+    yield put({
+      type: ReduxActionTypes.CLOSE_MODAL,
+      payload: {},
+    });
   }
 }
 
@@ -292,7 +360,11 @@ function* focusOnWidgetSaga(action: ReduxAction<{ widgetIds: string[] }>) {
   const widgetId = action.payload.widgetIds[0];
   if (widgetId) {
     const allWidgets: CanvasWidgetsReduxState = yield select(getCanvasWidgets);
-    quickScrollToWidget(widgetId, allWidgets);
+    const widgetIdSelector: string = yield select(
+      getWidgetSelectorByWidgetId,
+      widgetId,
+    );
+    quickScrollToWidget(widgetId, widgetIdSelector, allWidgets);
   }
 }
 

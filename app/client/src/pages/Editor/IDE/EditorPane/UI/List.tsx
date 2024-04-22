@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo } from "react";
 import { Button, Flex } from "design-system";
 import WidgetEntity from "pages/Editor/Explorer/Widgets/WidgetEntity";
 import { useSelector } from "react-redux";
@@ -16,7 +16,6 @@ import { EmptyState } from "../components/EmptyState";
 import history from "utils/history";
 import { builderURL } from "@appsmith/RouteBuilder";
 import styled from "styled-components";
-import { getIsSideBySideEnabled } from "selectors/ideSelectors";
 
 const ListContainer = styled(Flex)`
   & .t--entity-item {
@@ -27,12 +26,13 @@ const ListContainer = styled(Flex)`
   }
 `;
 
-const ListWidgets = () => {
+const ListWidgets = (props: {
+  setFocusSearchInput: (focusSearchInput: boolean) => void;
+}) => {
   const pageId = useSelector(getCurrentPageId) as string;
   const widgets = useSelector(selectWidgetsForCurrentPage);
   const pagePermissions = useSelector(getPagePermissions);
   const isFeatureEnabled = useFeatureFlag(FEATURE_FLAG.license_gac_enabled);
-  const isSideBySideEnabled = useSelector(getIsSideBySideEnabled);
 
   const canManagePages = getHasManagePagePermission(
     isFeatureEnabled,
@@ -44,11 +44,16 @@ const ListWidgets = () => {
   }, [widgets?.children]);
 
   const addButtonClickHandler = useCallback(() => {
+    props.setFocusSearchInput(true);
     history.push(builderURL({}));
   }, []);
 
   const widgetsExist =
     widgets && widgets.children && widgets.children.length > 0;
+
+  useEffect(() => {
+    props.setFocusSearchInput(false);
+  }, []);
 
   return (
     <ListContainer
@@ -68,7 +73,7 @@ const ListWidgets = () => {
           icon={"widgets-v3"}
           onClick={canManagePages ? addButtonClickHandler : undefined}
         />
-      ) : canManagePages && !isSideBySideEnabled ? (
+      ) : canManagePages ? (
         /* We show the List Add button when side by side is not enabled  */
         <Flex flexDirection="column" px="spaces-3">
           <Button
@@ -83,7 +88,13 @@ const ListWidgets = () => {
         </Flex>
       ) : null}
       {widgetsExist ? (
-        <Flex flex="1" flexDirection={"column"} overflowY="auto" px="spaces-3">
+        <Flex
+          data-testid="t--ide-list"
+          flex="1"
+          flexDirection={"column"}
+          overflowY="auto"
+          px="spaces-3"
+        >
           {widgets?.children?.map((child) => (
             <WidgetEntity
               childWidgets={child.children}

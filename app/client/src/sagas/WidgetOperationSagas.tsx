@@ -41,7 +41,7 @@ import {
   getIsAutoLayout,
   getIsAutoLayoutMobileBreakPoint,
 } from "selectors/editorSelectors";
-import AnalyticsUtil from "utils/AnalyticsUtil";
+import AnalyticsUtil from "@appsmith/utils/AnalyticsUtil";
 import { convertToString } from "utils/AppsmithUtils";
 import type {
   BatchUpdateDynamicPropertyUpdates,
@@ -187,6 +187,8 @@ import { EMPTY_BINDING } from "components/editorComponents/ActionCreator/constan
 import { getLayoutSystemType } from "selectors/layoutSystemSelectors";
 import { addSuggestedWidgetAnvilAction } from "layoutSystems/anvil/integrations/actions/draggingActions";
 import { updateAndSaveAnvilLayout } from "layoutSystems/anvil/utils/anvilChecksUtils";
+import { shouldShowSlashCommandMenu } from "components/editorComponents/CodeEditor/codeEditorUtils";
+import { getIsAnvilLayout } from "layoutSystems/anvil/integrations/selectors";
 
 export function* resizeSaga(resizeAction: ReduxAction<WidgetResize>) {
   try {
@@ -608,7 +610,11 @@ export function* setWidgetDynamicPropertySaga(
 
   const propertyValue = get(widget, propertyPath);
   if (!propertyValue && isDynamic) {
-    set(widget, propertyPath, EMPTY_BINDING);
+    // Empty binding should not be set for table and json widgets' data property
+    // As these are getting populated with slash command menu on focus
+    if (!shouldShowSlashCommandMenu(widget.type, propertyPath)) {
+      set(widget, propertyPath, EMPTY_BINDING);
+    }
   }
 
   const stateWidgets: CanvasWidgetsReduxState = yield select(getWidgets);
@@ -996,6 +1002,7 @@ function* createSelectedWidgetsCopy(
     widgetId: string;
     parentId: string;
     list: FlattenedWidgetProps[];
+    hierarchy: number;
   }[] = yield all(selectedWidgets.map((each) => call(createWidgetCopy, each)));
 
   const saveResult: boolean = yield saveCopiedWidgets(
@@ -1135,14 +1142,14 @@ export function calculateNewWidgetPosition(
       !isThereACollision && shouldGroup
         ? widget.topRow
         : parentBottomRow
-        ? nextAvailableRow + widget.topRow
-        : nextAvailableRow,
+          ? nextAvailableRow + widget.topRow
+          : nextAvailableRow,
     bottomRow:
       !isThereACollision && shouldGroup
         ? widget.bottomRow
         : parentBottomRow
-        ? nextAvailableRow + widget.bottomRow
-        : nextAvailableRow + (widget.bottomRow - widget.topRow),
+          ? nextAvailableRow + widget.bottomRow
+          : nextAvailableRow + (widget.bottomRow - widget.topRow),
   };
 }
 
@@ -2185,6 +2192,13 @@ function* widgetBatchUpdatePropertySaga() {
   }
 }
 
+function* shouldCallSaga(saga: any, action: ReduxAction<unknown>) {
+  const isAnvilLayout: boolean = yield select(getIsAnvilLayout);
+  if (!isAnvilLayout) {
+    yield call(saga, action);
+  }
+}
+
 export default function* widgetOperationSagas() {
   yield fork(widgetAdditionSagas);
   yield fork(widgetDeletionSagas);
@@ -2223,7 +2237,11 @@ export default function* widgetOperationSagas() {
     ),
     takeLatest(ReduxActionTypes.UPDATE_CANVAS_SIZE, updateCanvasSize),
     takeLatest(ReduxActionTypes.COPY_SELECTED_WIDGET_INIT, copyWidgetSaga),
-    takeLeading(ReduxActionTypes.PASTE_COPIED_WIDGET_INIT, pasteWidgetSaga),
+    takeLeading(
+      ReduxActionTypes.PASTE_COPIED_WIDGET_INIT,
+      shouldCallSaga,
+      pasteWidgetSaga,
+    ),
     takeEvery(ReduxActionTypes.CUT_SELECTED_WIDGET, cutWidgetSaga),
     takeEvery(ReduxActionTypes.GROUP_WIDGETS_INIT, groupWidgetsSaga),
     takeEvery(ReduxActionTypes.PARTIAL_IMPORT_INIT, partialImportSaga),

@@ -15,7 +15,7 @@ import type {
 export class TokensAccessor {
   private seedColor?: ColorTypes;
   private colorMode?: ColorMode;
-  private borderRadius?: TokenObj;
+  private borderRadiusElevation?: TokenObj;
   private boxShadow?: TokenObj;
   private borderWidth?: TokenObj;
   private opacity?: TokenObj;
@@ -26,25 +26,29 @@ export class TokensAccessor {
   private sizing?: TokenObj;
   private zIndex?: TokenObj;
   private iconStyle?: IconStyle;
+  private strokeWidth?: TokenObj;
+  private iconSize?: TokenObj;
 
   constructor({
-    borderRadius,
+    borderRadiusElevation,
     borderWidth,
     boxShadow,
     colorMode,
     fontFamily,
+    iconSize,
     iconStyle,
     innerSpacing,
     opacity,
     outerSpacing,
     seedColor,
     sizing,
+    strokeWidth,
     typography,
     zIndex,
   }: TokenSource) {
     this.seedColor = seedColor;
     this.colorMode = colorMode;
-    this.borderRadius = borderRadius;
+    this.borderRadiusElevation = borderRadiusElevation;
     this.boxShadow = boxShadow;
     this.borderWidth = borderWidth;
     this.opacity = opacity;
@@ -55,6 +59,8 @@ export class TokensAccessor {
     this.typography = typography;
     this.zIndex = zIndex;
     this.iconStyle = iconStyle;
+    this.strokeWidth = strokeWidth;
+    this.iconSize = iconSize;
   }
 
   updateFontFamily = (fontFamily?: FontFamily) => {
@@ -73,8 +79,17 @@ export class TokensAccessor {
     this.colorMode = colorMode;
   };
 
-  updateBorderRadius = (borderRadius: TokenObj) => {
-    this.borderRadius = borderRadius;
+  updateBorderRadiusElevation = (borderRadiusElevation: TokenObj) => {
+    // when the border-radius base is 0px, we set all other border-radius to 0px
+    if (borderRadiusElevation["base"] == "0px") {
+      Object.keys(borderRadiusElevation).forEach((key) => {
+        if (key !== "base") {
+          borderRadiusElevation[key] = "0px";
+        }
+      });
+    }
+
+    this.borderRadiusElevation = borderRadiusElevation;
   };
 
   updateBoxShadow = (boxShadow: TokenObj) => {
@@ -109,6 +124,14 @@ export class TokensAccessor {
     this.iconStyle = iconStyle;
   };
 
+  updateStrokeWidth = (strokeWidth: TokenObj) => {
+    this.strokeWidth = strokeWidth;
+  };
+
+  updateIconSize = (iconSize: TokenObj) => {
+    this.iconSize = iconSize;
+  };
+
   getAllTokens = () => {
     return {
       typography: this.getTypography(),
@@ -117,11 +140,13 @@ export class TokensAccessor {
       ...this.getInnerSpacing(),
       ...this.getSizing(),
       ...this.getColors(),
-      ...this.getBorderRadius(),
+      ...this.getBorderRadiusElevation(),
       ...this.getBoxShadow(),
       ...this.getBorderWidth(),
       ...this.getOpacity(),
       ...this.getZIndex(),
+      ...this.getStrokeWidth(),
+      ...this.getIconSize(),
       colorMode: this.getColorMode(),
       iconStyle: this.getIconStyle(),
     };
@@ -175,10 +200,13 @@ export class TokensAccessor {
     return this.createTokenObject(this.sizing, "sizing");
   };
 
-  getBorderRadius = () => {
-    if (this.borderRadius == null) return {} as ThemeToken;
+  getBorderRadiusElevation = () => {
+    if (this.borderRadiusElevation == null) return {} as ThemeToken;
 
-    return this.createTokenObject(this.borderRadius, "borderRadius");
+    return this.createTokenObject(
+      this.borderRadiusElevation,
+      "borderRadiusElevation",
+    );
   };
 
   getBoxShadow = () => {
@@ -211,6 +239,18 @@ export class TokensAccessor {
 
   getIconStyle = () => {
     return this.iconStyle;
+  };
+
+  getStrokeWidth = () => {
+    if (this.strokeWidth == null) return {} as ThemeToken;
+
+    return this.createTokenObject(this.strokeWidth, "strokeWidth");
+  };
+
+  getIconSize = () => {
+    if (this.iconSize == null) return {} as ThemeToken;
+
+    return this.createTokenObject(this.iconSize, "iconSize");
   };
 
   private get isLightMode() {

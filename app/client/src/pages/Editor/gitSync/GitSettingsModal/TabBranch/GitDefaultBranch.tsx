@@ -14,10 +14,10 @@ import styled from "styled-components";
 import { useFeatureFlag } from "utils/hooks/useFeatureFlag";
 import { FEATURE_FLAG } from "@appsmith/entities/FeatureFlag";
 import { useAppsmithEnterpriseLink } from "./hooks";
-import AnalyticsUtil from "utils/AnalyticsUtil";
+import AnalyticsUtil from "@appsmith/utils/AnalyticsUtil";
 
 const Container = styled.div`
-  padding-top: 16px;
+  padding-top: 8px;
   padding-bottom: 16px;
 `;
 

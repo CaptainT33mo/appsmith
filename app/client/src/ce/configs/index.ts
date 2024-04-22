@@ -12,7 +12,6 @@ export interface INJECTED_CONFIGS {
   smartLook: {
     id: string;
   };
-  enableRapidAPI: boolean;
   segment: {
     apiKey: string;
     ceKey: string;
@@ -22,6 +21,7 @@ export interface INJECTED_CONFIGS {
     accountId: string;
     applicationId: string;
     browserAgentlicenseKey: string;
+    browserAgentEndpoint: string;
     otlpLicenseKey: string;
     otlpServiceName: string;
     otlpEndpoint: string;
@@ -40,6 +40,7 @@ export interface INJECTED_CONFIGS {
   logLevel: "debug" | "error";
   appVersion: {
     id: string;
+    sha: string;
     releaseDate: string;
     edition: string;
   };
@@ -93,6 +94,8 @@ export const getConfigsFromEnvVars = (): INJECTED_CONFIGS => {
       applicationId: process.env.APPSMITH_NEW_RELIC_APPLICATION_ID || "",
       browserAgentlicenseKey:
         process.env.APPSMITH_NEW_RELIC_BROWSER_AGENT_LICENSE_KEY || "",
+      browserAgentEndpoint:
+        process.env.APPSMITH_NEW_RELIC_BROWSER_AGENT_ENDPOINT || "",
       otlpLicenseKey: process.env.APPSMITH_NEW_RELIC_OTLP_LICENSE_KEY || "",
       otlpEndpoint: process.env.APPSMITH_NEW_RELIC_OTEL_SERVICE_NAME || "",
       otlpServiceName:
@@ -103,15 +106,13 @@ export const getConfigsFromEnvVars = (): INJECTED_CONFIGS => {
         | "debug"
         | "error"
         | undefined) || "error",
-    enableRapidAPI: process.env.REACT_APP_MARKETPLACE_URL
-      ? process.env.REACT_APP_MARKETPLACE_URL.length > 0
-      : false,
     cloudHosting: process.env.REACT_APP_CLOUD_HOSTING
       ? process.env.REACT_APP_CLOUD_HOSTING.length > 0
       : false,
     appVersion: {
-      id: process.env.REACT_APP_VERSION_ID || "",
-      releaseDate: process.env.REACT_APP_VERSION_RELEASE_DATE || "",
+      id: "",
+      sha: "",
+      releaseDate: "",
       edition: process.env.REACT_APP_VERSION_EDITION || "",
     },
     intercomAppID: process.env.REACT_APP_INTERCOM_APP_ID || "",
@@ -172,6 +173,10 @@ export const getAppsmithConfigs = (): AppsmithUIConfigs => {
   const newRelicBrowserLicenseKey = getConfig(
     ENV_CONFIG.newRelic.browserAgentlicenseKey,
     APPSMITH_FEATURE_CONFIGS?.newRelic.browserAgentlicenseKey,
+  );
+  const newRelicBrowserAgentEndpoint = getConfig(
+    ENV_CONFIG.newRelic.browserAgentEndpoint,
+    APPSMITH_FEATURE_CONFIGS?.newRelic.browserAgentEndpoint,
   );
   const newRelicOtlpLicenseKey = getConfig(
     ENV_CONFIG.newRelic.otlpLicenseKey,
@@ -265,6 +270,7 @@ export const getAppsmithConfigs = (): AppsmithUIConfigs => {
       accountId: newRelicAccountId.value,
       applicationId: newRelicApplicationId.value,
       browserAgentlicenseKey: newRelicBrowserLicenseKey.value,
+      browserAgentEndpoint: newRelicBrowserAgentEndpoint.value,
       otlpLicenseKey: newRelicOtlpLicenseKey.value,
       otlpEndpoint: newRelicOtlpEndpoint.value,
       otlpServiceName: newRelicOtlpServiceName.value,
@@ -284,10 +290,6 @@ export const getAppsmithConfigs = (): AppsmithUIConfigs => {
       enabled: googleRecaptchaSiteKey.enabled,
       apiKey: googleRecaptchaSiteKey.value,
     },
-    enableRapidAPI:
-      ENV_CONFIG.enableRapidAPI ||
-      APPSMITH_FEATURE_CONFIGS?.enableRapidAPI ||
-      false,
     enableMixpanel:
       ENV_CONFIG.enableMixpanel ||
       APPSMITH_FEATURE_CONFIGS?.enableMixpanel ||
@@ -299,14 +301,9 @@ export const getAppsmithConfigs = (): AppsmithUIConfigs => {
     logLevel:
       ENV_CONFIG.logLevel || APPSMITH_FEATURE_CONFIGS?.logLevel || false,
     appVersion: {
-      id:
-        APPSMITH_FEATURE_CONFIGS?.appVersion?.id ||
-        ENV_CONFIG.appVersion?.id ||
-        "",
-      releaseDate:
-        APPSMITH_FEATURE_CONFIGS?.appVersion?.releaseDate ||
-        ENV_CONFIG.appVersion?.releaseDate ||
-        "",
+      id: APPSMITH_FEATURE_CONFIGS?.appVersion?.id || "",
+      sha: APPSMITH_FEATURE_CONFIGS?.appVersion?.sha || "",
+      releaseDate: APPSMITH_FEATURE_CONFIGS?.appVersion?.releaseDate || "",
       edition:
         ENV_CONFIG.appVersion?.edition ||
         APPSMITH_FEATURE_CONFIGS?.appVersion?.edition ||

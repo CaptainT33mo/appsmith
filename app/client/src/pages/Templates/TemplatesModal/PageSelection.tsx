@@ -7,7 +7,7 @@ import {
   PAGES,
   createMessage,
 } from "@appsmith/constants/messages";
-import { getCurrentAppWorkspace } from "@appsmith/selectors/workspaceSelectors";
+import { getCurrentAppWorkspace } from "@appsmith/selectors/selectedWorkspaceSelectors";
 import { importTemplateIntoApplication } from "actions/templateActions";
 import type { Template } from "api/TemplatesApi";
 import { STARTER_BUILDING_BLOCK_TEMPLATE_NAME } from "constants/TemplatesConstants";
@@ -16,7 +16,7 @@ import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { getCurrentApplicationId } from "selectors/editorSelectors";
 import styled from "styled-components";
-import AnalyticsUtil from "utils/AnalyticsUtil";
+import AnalyticsUtil from "@appsmith/utils/AnalyticsUtil";
 
 const Wrapper = styled.div`
   width: 280px;

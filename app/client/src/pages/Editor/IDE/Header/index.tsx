@@ -27,7 +27,6 @@ import {
   DEPLOY_MENU_OPTION,
   IN_APP_EMBED_SETTING,
   INVITE_TAB,
-  RENAME_APPLICATION_TOOLTIP,
   HEADER_TITLES,
 } from "@appsmith/constants/messages";
 import EditorName from "pages/Editor/EditorName";
@@ -35,8 +34,10 @@ import { GetNavigationMenuData } from "pages/Editor/EditorName/NavigationMenuDat
 import {
   getCurrentApplicationId,
   getCurrentPageId,
+  getIsPageSaving,
   getIsPublishingApplication,
   getPageById,
+  getPageSavingError,
 } from "selectors/editorSelectors";
 import {
   getApplicationList,
@@ -48,7 +49,7 @@ import {
   publishApplication,
   updateApplication,
 } from "@appsmith/actions/applicationActions";
-import { getCurrentAppWorkspace } from "@appsmith/selectors/workspaceSelectors";
+import { getCurrentAppWorkspace } from "@appsmith/selectors/selectedWorkspaceSelectors";
 import { Omnibar } from "pages/Editor/commons/Omnibar";
 import ToggleModeButton from "pages/Editor/ToggleModeButton";
 import { EditorShareButton } from "pages/Editor/EditorShareButton";
@@ -65,7 +66,7 @@ import {
   protectedModeSelector,
 } from "selectors/gitSyncSelectors";
 import { showConnectGitModal } from "actions/gitSyncActions";
-import AnalyticsUtil from "utils/AnalyticsUtil";
+import AnalyticsUtil from "@appsmith/utils/AnalyticsUtil";
 import type { NavigationSetting } from "constants/AppConstants";
 import { useHref } from "pages/Editor/utils";
 import { viewerURL } from "@appsmith/RouteBuilder";
@@ -74,6 +75,8 @@ import { EditorTitle } from "./EditorTitle";
 import { useCurrentAppState } from "pages/Editor/IDE/hooks";
 import { DefaultTitle } from "./DeaultTitle";
 import { EditorState } from "@appsmith/entities/IDE/constants";
+import { EditorSaveIndicator } from "pages/Editor/EditorSaveIndicator";
+import type { Page } from "@appsmith/constants/ReduxActionConstants";
 
 const StyledDivider = styled(Divider)`
   height: 50%;
@@ -82,6 +85,41 @@ const StyledDivider = styled(Divider)`
 `;
 
 const { cloudHosting } = getAppsmithConfigs();
+
+interface HeaderTitleProps {
+  appState: EditorState;
+  currentPage?: Page;
+}
+
+const HeaderTitleComponent = ({ appState, currentPage }: HeaderTitleProps) => {
+  switch (appState) {
+    case EditorState.DATA:
+      return (
+        <DefaultTitle
+          key={appState}
+          title={createMessage(HEADER_TITLES.DATA)}
+        />
+      );
+    case EditorState.EDITOR:
+      return <EditorTitle key={appState} title={currentPage?.pageName || ""} />;
+    case EditorState.SETTINGS:
+      return (
+        <DefaultTitle
+          key={appState}
+          title={createMessage(HEADER_TITLES.SETTINGS)}
+        />
+      );
+    case EditorState.LIBRARIES:
+      return (
+        <DefaultTitle
+          key={appState}
+          title={createMessage(HEADER_TITLES.LIBRARIES)}
+        />
+      );
+    default:
+      return <EditorTitle key={appState} title={currentPage?.pageName || ""} />;
+  }
+};
 
 const Header = () => {
   const dispatch = useDispatch();
@@ -99,6 +137,8 @@ const Header = () => {
   const pageId = useSelector(getCurrentPageId) as string;
   const currentPage = useSelector(getPageById(pageId));
   const appState = useCurrentAppState();
+  const isSaving = useSelector(getIsPageSaving);
+  const pageSaveError = useSelector(getPageSavingError);
 
   // states
   const [isPopoverOpen, setIsPopoverOpen] = useState<boolean>(false);
@@ -180,21 +220,6 @@ const Header = () => {
     [dispatch, handlePublish],
   );
 
-  const TitleComponent = () => {
-    switch (appState) {
-      case EditorState.DATA:
-        return <DefaultTitle title={createMessage(HEADER_TITLES.DATA)} />;
-      case EditorState.EDITOR:
-        return <EditorTitle title={currentPage?.pageName || ""} />;
-      case EditorState.SETTINGS:
-        return <DefaultTitle title={createMessage(HEADER_TITLES.SETTINGS)} />;
-      case EditorState.LIBRARIES:
-        return <DefaultTitle title={createMessage(HEADER_TITLES.LIBRARIES)} />;
-      default:
-        return <EditorTitle title={currentPage?.pageName || ""} />;
-    }
-  };
-
   return (
     <Flex
       alignItems={"center"}
@@ -202,7 +227,6 @@ const Header = () => {
       className={"t--editor-header"}
       height={"40px"}
       overflow={"hidden"}
-      px={"spaces-4"}
       width={"100%"}
     >
       <Flex
@@ -212,9 +236,12 @@ const Header = () => {
         gap={"spaces-4"}
         height={"100%"}
         justifyContent={"left"}
+        pl={"spaces-4"}
       >
         <AppsmithLink />
-        <TitleComponent />
+        <Divider orientation="vertical" />
+        <HeaderTitleComponent appState={appState} currentPage={currentPage} />
+        <EditorSaveIndicator isSaving={isSaving} saveError={pageSaveError} />
       </Flex>
       <Flex
         alignItems={"center"}
@@ -223,49 +250,43 @@ const Header = () => {
         height={"100%"}
         justifyContent={"center"}
       >
-        <Tooltip
-          content={createMessage(RENAME_APPLICATION_TOOLTIP)}
-          isDisabled={isPopoverOpen}
-          placement="bottom"
-        >
-          <Flex alignItems={"center"}>
-            {currentWorkspace.name && (
-              <>
-                <Text
-                  color={"var(--ads-v2-colors-content-label-inactive-fg)"}
-                  kind="body-m"
-                >
-                  {currentWorkspace.name + " / "}
-                </Text>
-                <EditorName
-                  applicationId={applicationId}
-                  className="t--application-name editable-application-name max-w-48"
-                  defaultSavingState={
-                    isSavingName ? SavingState.STARTED : SavingState.NOT_STARTED
-                  }
-                  defaultValue={currentApplication?.name || ""}
-                  editInteractionKind={EditInteractionKind.SINGLE}
-                  editorName="Application"
-                  fill
-                  getNavigationMenu={GetNavigationMenuData}
-                  isError={isErroredSavingName}
-                  isNewEditor={
-                    applicationList.filter((el) => el.id === applicationId)
-                      .length > 0
-                  }
-                  isPopoverOpen={isPopoverOpen}
-                  onBlur={(value: string) =>
-                    updateApplicationDispatch(applicationId || "", {
-                      name: value,
-                      currentApp: true,
-                    })
-                  }
-                  setIsPopoverOpen={setIsPopoverOpen}
-                />
-              </>
-            )}
-          </Flex>
-        </Tooltip>
+        <Flex alignItems={"center"}>
+          {currentWorkspace.name && (
+            <>
+              <Text
+                color={"var(--ads-v2-colors-content-label-inactive-fg)"}
+                kind="body-m"
+              >
+                {currentWorkspace.name + " / "}
+              </Text>
+              <EditorName
+                applicationId={applicationId}
+                className="t--application-name editable-application-name max-w-48"
+                defaultSavingState={
+                  isSavingName ? SavingState.STARTED : SavingState.NOT_STARTED
+                }
+                defaultValue={currentApplication?.name || ""}
+                editInteractionKind={EditInteractionKind.SINGLE}
+                editorName="Application"
+                fill
+                getNavigationMenu={GetNavigationMenuData}
+                isError={isErroredSavingName}
+                isNewEditor={
+                  applicationList.filter((el) => el.id === applicationId)
+                    .length > 0
+                }
+                isPopoverOpen={isPopoverOpen}
+                onBlur={(value: string) =>
+                  updateApplicationDispatch(applicationId || "", {
+                    name: value,
+                    currentApp: true,
+                  })
+                }
+                setIsPopoverOpen={setIsPopoverOpen}
+              />
+            </>
+          )}
+        </Flex>
       </Flex>
       <Flex
         alignItems={"center"}

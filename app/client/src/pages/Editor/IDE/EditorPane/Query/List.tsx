@@ -2,7 +2,6 @@ import React from "react";
 import { Button, Flex, Text } from "design-system";
 import { useSelector } from "react-redux";
 
-import ExplorerActionEntity from "pages/Editor/Explorer/Actions/ActionEntity";
 import { getHasCreateActionPermission } from "@appsmith/utils/BusinessFeatures/permissionPageHelpers";
 import { useActiveAction } from "@appsmith/pages/Editor/Explorer/hooks";
 import {
@@ -16,8 +15,10 @@ import { selectQuerySegmentEditorList } from "@appsmith/selectors/appIDESelector
 import { ActionParentEntityType } from "@appsmith/entities/Engine/actionHelpers";
 import { FilesContextProvider } from "pages/Editor/Explorer/Files/FilesContextProvider";
 import { createMessage, EDITOR_PANE_TEXTS } from "@appsmith/constants/messages";
-import { EmptyState } from "../components/EmptyState";
-import { useQueryAdd } from "./hooks";
+import { useQueryAdd } from "@appsmith/pages/Editor/IDE/EditorPane/Query/hooks";
+import { QueryListItem } from "@appsmith/pages/Editor/IDE/EditorPane/Query/ListItem";
+import { getShowWorkflowFeature } from "@appsmith/selectors/workflowSelectors";
+import { BlankState } from "./BlankState";
 
 const ListQuery = () => {
   const pageId = useSelector(getCurrentPageId) as string;
@@ -33,6 +34,7 @@ const ListQuery = () => {
   const applicationId = useSelector(getCurrentApplicationId);
 
   const addButtonClickHandler = useQueryAdd();
+  const showWorkflows = useSelector(getShowWorkflowFeature);
 
   return (
     <Flex
@@ -42,7 +44,7 @@ const ListQuery = () => {
       overflow="hidden"
       py="spaces-3"
     >
-      {Object.keys(files).length > 0 && canCreateActions && (
+      {files.length > 0 && canCreateActions && (
         <Flex flexDirection={"column"} px="spaces-3">
           <Button
             className="t--add-item"
@@ -77,18 +79,16 @@ const ListQuery = () => {
                 editorId={applicationId}
                 parentEntityId={pageId}
                 parentEntityType={ActionParentEntityType.PAGE}
+                showWorkflows={showWorkflows}
               >
                 {items.map((file) => {
                   return (
-                    <ExplorerActionEntity
-                      id={file.key}
+                    <QueryListItem
                       isActive={file.key === activeActionId}
+                      item={file}
                       key={file.key}
                       parentEntityId={pageId}
                       parentEntityType={ActionParentEntityType.PAGE}
-                      searchKeyword={""}
-                      step={1}
-                      type={file.type}
                     />
                   );
                 })}
@@ -98,17 +98,7 @@ const ListQuery = () => {
         })}
       </Flex>
 
-      {Object.keys(files).length === 0 && (
-        <EmptyState
-          buttonClassName="t--add-item"
-          buttonText={createMessage(EDITOR_PANE_TEXTS.query_add_button)}
-          description={createMessage(
-            EDITOR_PANE_TEXTS.query_blank_state_description,
-          )}
-          icon={"queries-v3"}
-          onClick={canCreateActions ? addButtonClickHandler : undefined}
-        />
-      )}
+      {Object.keys(files).length === 0 && <BlankState />}
     </Flex>
   );
 };

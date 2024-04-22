@@ -1,5 +1,6 @@
 package com.appsmith.server.newpages.base;
 
+import com.appsmith.external.enums.WorkspaceResourceContext;
 import com.appsmith.external.models.DefaultResources;
 import com.appsmith.server.acl.AclPermission;
 import com.appsmith.server.applications.base.ApplicationService;
@@ -12,18 +13,17 @@ import com.appsmith.server.domains.NewPage;
 import com.appsmith.server.dtos.ApplicationPagesDTO;
 import com.appsmith.server.dtos.PageDTO;
 import com.appsmith.server.dtos.PageNameIdDTO;
+import com.appsmith.server.dtos.PageUpdateDTO;
 import com.appsmith.server.exceptions.AppsmithError;
 import com.appsmith.server.exceptions.AppsmithException;
 import com.appsmith.server.helpers.ResponseUtils;
 import com.appsmith.server.helpers.TextUtils;
-import com.appsmith.server.repositories.ApplicationSnapshotRepository;
 import com.appsmith.server.repositories.NewPageRepository;
 import com.appsmith.server.services.AnalyticsService;
 import com.appsmith.server.services.BaseService;
 import com.appsmith.server.services.UserDataService;
 import com.appsmith.server.solutions.ApplicationPermission;
 import com.appsmith.server.solutions.PagePermission;
-import com.mongodb.bulk.BulkWriteResult;
 import jakarta.validation.Validator;
 import lombok.extern.slf4j.Slf4j;
 import net.minidev.json.JSONObject;
@@ -31,13 +31,10 @@ import net.minidev.json.parser.JSONParser;
 import net.minidev.json.parser.ParseException;
 import org.bson.types.ObjectId;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.mongodb.core.ReactiveMongoTemplate;
-import org.springframework.data.mongodb.core.convert.MongoConverter;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Scheduler;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -48,6 +45,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static com.appsmith.external.helpers.AppsmithBeanUtils.copyNewFieldValuesIntoOldObject;
@@ -61,29 +59,23 @@ public class NewPageServiceCEImpl extends BaseService<NewPageRepository, NewPage
     private final ResponseUtils responseUtils;
     private final ApplicationPermission applicationPermission;
     private final PagePermission pagePermission;
-    private final ApplicationSnapshotRepository applicationSnapshotRepository;
 
     @Autowired
     public NewPageServiceCEImpl(
-            Scheduler scheduler,
             Validator validator,
-            MongoConverter mongoConverter,
-            ReactiveMongoTemplate reactiveMongoTemplate,
             NewPageRepository repository,
             AnalyticsService analyticsService,
             ApplicationService applicationService,
             UserDataService userDataService,
             ResponseUtils responseUtils,
             ApplicationPermission applicationPermission,
-            PagePermission pagePermission,
-            ApplicationSnapshotRepository applicationSnapshotRepository) {
-        super(scheduler, validator, mongoConverter, reactiveMongoTemplate, repository, analyticsService);
+            PagePermission pagePermission) {
+        super(validator, repository, analyticsService);
         this.applicationService = applicationService;
         this.userDataService = userDataService;
         this.responseUtils = responseUtils;
         this.applicationPermission = applicationPermission;
         this.pagePermission = pagePermission;
-        this.applicationSnapshotRepository = applicationSnapshotRepository;
     }
 
     @Override
@@ -155,7 +147,7 @@ public class NewPageServiceCEImpl extends BaseService<NewPageRepository, NewPage
                     newPage.setUnpublishedPage(page);
                     // gitSyncId will be used to sync resource across instances
                     if (newPage.getGitSyncId() == null) {
-                        newPage.setGitSyncId(page.getApplicationId() + "_" + new ObjectId());
+                        newPage.setGitSyncId(page.getApplicationId() + "_" + UUID.randomUUID());
                     }
                     return repository.save(newPage);
                 })
@@ -171,7 +163,7 @@ public class NewPageServiceCEImpl extends BaseService<NewPageRepository, NewPage
         newPage.setPolicies(object.getPolicies());
         if (newPage.getGitSyncId() == null) {
             // Make sure gitSyncId will be unique
-            newPage.setGitSyncId(newPage.getApplicationId() + "_" + new ObjectId());
+            newPage.setGitSyncId(newPage.getApplicationId() + "_" + UUID.randomUUID());
         }
         DefaultResources defaultResources = object.getDefaultResources();
         newPage.setDefaultResources(defaultResources);
@@ -261,7 +253,10 @@ public class NewPageServiceCEImpl extends BaseService<NewPageRepository, NewPage
                     if (markApplicationAsRecentlyAccessed) {
                         // add this application and workspace id to the recently used list in UserData
                         return userDataService
-                                .updateLastUsedAppAndWorkspaceList(application)
+                                .updateLastUsedResourceAndWorkspaceList(
+                                        application.getId(),
+                                        application.getWorkspaceId(),
+                                        WorkspaceResourceContext.APPLICATIONS)
                                 .thenReturn(application);
                     } else {
                         return Mono.just(application);
@@ -477,11 +472,6 @@ public class NewPageServiceCEImpl extends BaseService<NewPageRepository, NewPage
     }
 
     @Override
-    public Flux<NewPage> findNewPagesByApplicationId(String applicationId, Optional<AclPermission> permission) {
-        return repository.findByApplicationId(applicationId, permission);
-    }
-
-    @Override
     public Mono<List<NewPage>> archivePagesByApplicationId(String applicationId, AclPermission permission) {
         return findNewPagesByApplicationId(applicationId, permission)
                 .flatMap(repository::archive)
@@ -530,10 +520,11 @@ public class NewPageServiceCEImpl extends BaseService<NewPageRepository, NewPage
     }
 
     @Override
-    public Mono<PageDTO> updatePageByDefaultPageIdAndBranch(String defaultPageId, PageDTO page, String branchName) {
+    public Mono<PageDTO> updatePageByDefaultPageIdAndBranch(
+            String defaultPageId, PageUpdateDTO page, String branchName) {
         return repository
                 .findPageByBranchNameAndDefaultPageId(branchName, defaultPageId, pagePermission.getEditPermission())
-                .flatMap(newPage -> updatePage(newPage.getId(), page))
+                .flatMap(newPage -> updatePage(newPage.getId(), page.toPageDTO()))
                 .map(responseUtils::updatePageDTOWithDefaultResources);
     }
 
@@ -541,7 +532,7 @@ public class NewPageServiceCEImpl extends BaseService<NewPageRepository, NewPage
     public Mono<NewPage> save(NewPage page) {
         // gitSyncId will be used to sync resource across instances
         if (page.getGitSyncId() == null) {
-            page.setGitSyncId(page.getApplicationId() + "_" + new ObjectId());
+            page.setGitSyncId(page.getApplicationId() + "_" + UUID.randomUUID());
         }
         return repository.save(page);
     }
@@ -579,7 +570,7 @@ public class NewPageServiceCEImpl extends BaseService<NewPageRepository, NewPage
     public Flux<NewPage> saveAll(List<NewPage> pages) {
         pages.stream()
                 .filter(newPage -> newPage.getGitSyncId() == null)
-                .forEach(newPage -> newPage.setGitSyncId(newPage.getId() + "_" + new ObjectId()));
+                .forEach(newPage -> newPage.setGitSyncId(newPage.getId() + "_" + UUID.randomUUID()));
         return repository.saveAll(pages);
     }
 
@@ -628,10 +619,12 @@ public class NewPageServiceCEImpl extends BaseService<NewPageRepository, NewPage
             if (!StringUtils.hasLength(defaultPageId)) {
                 return Mono.error(new AppsmithException(INVALID_PARAMETER, FieldName.PAGE_ID, defaultPageId));
             }
-            getPageMono = repository.findById(
-                    defaultPageId,
-                    List.of(FieldName.APPLICATION_ID, FieldName.DEFAULT_RESOURCES),
-                    pagePermission.getReadPermission());
+            getPageMono = repository
+                    .queryBuilder()
+                    .byId(defaultPageId)
+                    .fields(FieldName.APPLICATION_ID, FieldName.DEFAULT_RESOURCES)
+                    .permission(pagePermission.getReadPermission())
+                    .one();
         } else {
             getPageMono = repository.findPageByBranchNameAndDefaultPageId(
                     branchName, defaultPageId, pagePermission.getReadPermission());
@@ -696,7 +689,7 @@ public class NewPageServiceCEImpl extends BaseService<NewPageRepository, NewPage
     }
 
     @Override
-    public Mono<List<BulkWriteResult>> publishPages(Collection<String> pageIds, AclPermission permission) {
+    public Mono<Void> publishPages(Collection<String> pageIds, AclPermission permission) {
         return repository.publishPages(pageIds, permission);
     }
 }

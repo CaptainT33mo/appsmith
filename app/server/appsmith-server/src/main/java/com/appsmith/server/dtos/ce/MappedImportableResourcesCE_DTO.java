@@ -1,6 +1,6 @@
 package com.appsmith.server.dtos.ce;
 
-import com.appsmith.external.models.BranchAwareDomain;
+import com.appsmith.server.domains.Context;
 import com.appsmith.server.dtos.CustomJSLibContextDTO;
 import com.appsmith.server.dtos.ImportActionCollectionResultDTO;
 import com.appsmith.server.dtos.ImportActionResultDTO;
@@ -22,14 +22,18 @@ public class MappedImportableResourcesCE_DTO {
 
     // Artifact dependent
     // This attribute is re-usable across artifacts according to the needs
-    Map<String, String> pageOrModuleNewNameToOldName;
+    Map<String, String> contextNewNameToOldName;
+
+    // Artifact independent, used in PartialImport
+    // This attribute contain set of names used/existing in page such as widgetName, action and actionCollection names
+    Map<String, String> refactoringNameReference;
 
     /**
      * Attribute used to carry objects specific to the context of the Artifacts.
      * In case of application it carries the NewPage entity
      * In case of packages it would carry modules
      */
-    Map<String, ? extends BranchAwareDomain> pageOrModuleMap;
+    Map<String, ? extends Context> contextMap;
 
     // Artifact dependent and common
     List<CustomJSLibContextDTO> installedJsLibsList;

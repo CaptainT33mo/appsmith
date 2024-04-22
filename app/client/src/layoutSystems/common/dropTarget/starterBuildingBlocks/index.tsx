@@ -6,7 +6,7 @@ import {
 } from "@appsmith/constants/messages";
 import { saveExplorerStatus } from "@appsmith/pages/Editor/Explorer/helpers";
 import { getAppMode } from "@appsmith/selectors/applicationSelectors";
-import { getCurrentAppWorkspace } from "@appsmith/selectors/workspaceSelectors";
+import { getCurrentAppWorkspace } from "@appsmith/selectors/selectedWorkspaceSelectors";
 import {
   importStarterBuildingBlockIntoApplication,
   showTemplatesModal,
@@ -23,7 +23,7 @@ import {
   getCurrentApplicationId,
 } from "selectors/editorSelectors";
 import { isImportingStarterBuildingBlockToAppSelector } from "selectors/templatesSelectors";
-import AnalyticsUtil from "utils/AnalyticsUtil";
+import AnalyticsUtil from "@appsmith/utils/AnalyticsUtil";
 import {
   IconContainer,
   TemplateLayoutContainer,

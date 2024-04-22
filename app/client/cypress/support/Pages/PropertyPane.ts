@@ -172,6 +172,7 @@ export class PropertyPane {
 
   _dataIcon = (icon: string) => `[data-icon="${icon}"]`;
   _iconDropdown = "[data-test-id='virtuoso-scroller']";
+  _dropdownControlError = "[data-testid='t---dropdown-control-error']";
 
   public OpenJsonFormFieldSettings(fieldName: string) {
     this.agHelper.GetNClick(this._jsonFieldEdit(fieldName));
@@ -660,5 +661,16 @@ export class PropertyPane {
       }
       this.SetZoomLevel(zoom);
     });
+  }
+
+  public FocusIntoTextField(endp: string) {
+    this.agHelper
+      .GetElement(this.locator._propertyInputField(endp))
+      .first()
+      .then((el: any) => {
+        cy.get(el).focus();
+      });
+
+    this.agHelper.AssertAutoSave(); //Allowing time for saving entered value
   }
 }

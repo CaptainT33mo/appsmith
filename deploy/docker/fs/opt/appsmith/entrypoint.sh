@@ -319,7 +319,7 @@ setup-custom-ca-certificates() (
     -deststorepass changeit
 
   # Add the custom CA certificates to the store.
-  find "$stacks_ca_certs_path" -maxdepth 1 -type f -name '*.crt' \
+  find -L "$stacks_ca_certs_path" -maxdepth 1 -type f -name '*.crt' \
     -print \
     -exec keytool -import -alias '{}' -noprompt -keystore "$store" -file '{}' -storepass changeit ';'
 
@@ -327,9 +327,6 @@ setup-custom-ca-certificates() (
     echo "-Djavax.net.ssl.trustStore=$store"
     echo "-Djavax.net.ssl.trustStorePassword=changeit"
   } > "$opts_file"
-
-  # Get certbot to use the combined trusted CA certs file.
-  export REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
 )
 
 configure_supervisord() {
@@ -390,9 +387,13 @@ init_postgres() {
     echo "Checking initialized local postgres"
     POSTGRES_DB_PATH="$stacks_path/data/postgres/main"
 
-    if [ -e "$POSTGRES_DB_PATH/PG_VERSION" ]; then
-        echo "Found existing Postgres, Skipping initialization"
-        chown -R postgres:postgres "$POSTGRES_DB_PATH"
+    mkdir -p "$POSTGRES_DB_PATH" "$TMP/pg-runtime"
+
+    # Postgres does not allow it's server to be run with super user access, we use user postgres and the file system owner also needs to be the same user postgres
+    chown -R postgres:postgres "$POSTGRES_DB_PATH" "$TMP/pg-runtime"
+
+    if [[ -e "$POSTGRES_DB_PATH/PG_VERSION" ]]; then
+      echo "Found existing Postgres, Skipping initialization"
     else
       echo "Initializing local postgresql database"
       mkdir -p "$POSTGRES_DB_PATH"
@@ -402,6 +403,7 @@ init_postgres() {
 
       # Initialize the postgres db file system
       su postgres -c "/usr/lib/postgresql/13/bin/initdb -D $POSTGRES_DB_PATH"
+      sed -Ei "s,^#(unix_socket_directories =).*,\\1 '$TMP/pg-runtime'," "$POSTGRES_DB_PATH/postgresql.conf"
 
       # Start the postgres server in daemon mode
       su postgres -c "/usr/lib/postgresql/13/bin/pg_ctl -D $POSTGRES_DB_PATH start"
@@ -452,11 +454,16 @@ function setup_auto_heal(){
    if [[ ${APPSMITH_AUTO_HEAL-} = 1 ]]; then
      # By default APPSMITH_AUTO_HEAL=0
      # To enable auto heal set APPSMITH_AUTO_HEAL=1
-     bash /opt/appsmith/auto_heal.sh $APPSMITH_AUTO_HEAL_CURL_TIMEOUT >> /appsmith-stacks/logs/cron/auto_heal.log 2>&1 &
+     bash /opt/appsmith/auto_heal.sh $APPSMITH_AUTO_HEAL_CURL_TIMEOUT >> "$APPSMITH_LOG_DIR"/cron/auto_heal.log 2>&1 &
    fi
 }
 
+print_appsmith_info(){
+  tr '\n' ' ' < /opt/appsmith/info.json
+}
+
 # Main Section
+print_appsmith_info
 init_loading_pages
 init_env_file
 setup_proxy_variables
@@ -488,7 +495,8 @@ configure_supervisord
 mkdir -p /appsmith-stacks/data/{backup,restore} /appsmith-stacks/ssl
 
 # Create sub-directory to store services log in the container mounting folder
-mkdir -p /appsmith-stacks/logs/{supervisor,backend,cron,editor,rts,mongodb,redis,postgres,appsmithctl}
+export APPSMITH_LOG_DIR="${APPSMITH_LOG_DIR:-/appsmith-stacks/logs}"
+mkdir -p "$APPSMITH_LOG_DIR"/{supervisor,backend,cron,editor,rts,mongodb,redis,postgres,appsmithctl}
 
 setup_auto_heal
 

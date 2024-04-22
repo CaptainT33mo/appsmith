@@ -7,7 +7,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
-import org.springframework.data.mongodb.core.mapping.Document;
+import lombok.experimental.FieldNameConstants;
 
 import java.util.List;
 
@@ -18,7 +18,7 @@ import java.util.List;
 @EqualsAndHashCode
 @NoArgsConstructor
 @AllArgsConstructor
-@Document
+@FieldNameConstants
 public class DatasourceConfiguration implements AppsmithDomain {
 
     Connection connection;
